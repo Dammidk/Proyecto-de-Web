@@ -1,0 +1,325 @@
+// Configuración de Prisma para PostgreSQL
+// Sistema de Control de Transporte de Carga Pesada
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS - Estados y tipos predefinidos
+// ============================================
+
+enum RolUsuario {
+  ADMIN   // Puede crear, editar, borrar
+  AUDITOR // Solo lectura
+}
+
+enum EstadoVehiculo {
+  ACTIVO
+  EN_RUTA
+  EN_MANTENIMIENTO
+  INACTIVO
+}
+
+enum EstadoChofer {
+  ACTIVO
+  INACTIVO
+}
+
+enum ModalidadPago {
+  POR_VIAJE
+  MENSUAL
+}
+
+enum MetodoPago {
+  EFECTIVO
+  TRANSFERENCIA
+}
+
+enum EstadoCliente {
+  ACTIVO
+  INACTIVO
+}
+
+enum EstadoViaje {
+  PLANIFICADO
+  EN_CURSO
+  COMPLETADO
+  CANCELADO
+}
+
+enum TipoMantenimiento {
+  PREVENTIVO
+  CORRECTIVO
+}
+
+enum TipoGasto {
+  COMBUSTIBLE
+  PEAJE
+  ALIMENTACION
+  HOSPEDAJE
+  MULTA
+  OTRO
+}
+
+enum AccionAuditoria {
+  CREAR
+  EDITAR
+  ELIMINAR
+}
+
+// ============================================
+// MODELOS PRINCIPALES
+// ============================================
+
+model Usuario {
+  id            Int         @id @default(autoincrement())
+  nombreUsuario String      @unique @map("nombre_usuario")
+  email         String      @unique
+  passwordHash  String      @map("password_hash")
+  nombreCompleto String     @map("nombre_completo")
+  rol           RolUsuario  @default(ADMIN)
+  activo        Boolean     @default(true)
+  creadoEn      DateTime    @default(now()) @map("creado_en")
+  actualizadoEn DateTime    @updatedAt @map("actualizado_en")
+
+  // Relaciones
+  registrosAuditoria RegistroAuditoria[]
+
+  @@map("usuarios")
+}
+
+model Vehiculo {
+  id                    Int             @id @default(autoincrement())
+  placa                 String          @unique
+  marca                 String
+  modelo                String
+  anio                  Int             @map("anio")
+  tipo                  String          // Ej: "Trailer", "Cisterna", "Plataforma"
+  capacidad             String          // Ej: "30 toneladas", "10000 litros"
+  estado                EstadoVehiculo  @default(ACTIVO)
+  kilometrajeActual     Int             @default(0) @map("kilometraje_actual")
+  
+  // Fechas importantes
+  fechaUltimoMantenimiento DateTime?    @map("fecha_ultimo_mantenimiento")
+  fechaProximoMantenimiento DateTime?   @map("fecha_proximo_mantenimiento")
+  fechaVencimientoSoat     DateTime?    @map("fecha_vencimiento_soat")
+  fechaVencimientoSeguro   DateTime?    @map("fecha_vencimiento_seguro")
+  fechaVencimientoMatricula DateTime?   @map("fecha_vencimiento_matricula")
+  observaciones         String?
+  
+  creadoEn              DateTime        @default(now()) @map("creado_en")
+  actualizadoEn         DateTime        @updatedAt @map("actualizado_en")
+
+  // Relaciones (para futuras entregas)
+  viajes                Viaje[]
+  mantenimientos        Mantenimiento[]
+
+  @@map("vehiculos")
+}
+
+model Chofer {
+  id              Int           @id @default(autoincrement())
+  nombres         String
+  apellidos       String
+  documentoId     String        @unique @map("documento_id") // Cédula o RUC
+  telefono        String?
+  correo          String?
+  estado          EstadoChofer  @default(ACTIVO)
+  
+  // Configuración de pago
+  modalidadPago   ModalidadPago @default(POR_VIAJE) @map("modalidad_pago")
+  metodoPago      MetodoPago    @default(EFECTIVO) @map("metodo_pago")
+  banco           String?       // Solo si es transferencia
+  numeroCuenta    String?       @map("numero_cuenta")
+  sueldoMensual   Decimal?      @map("sueldo_mensual") @db.Decimal(10, 2)
+  
+  creadoEn        DateTime      @default(now()) @map("creado_en")
+  actualizadoEn   DateTime      @updatedAt @map("actualizado_en")
+
+  // Relaciones (para futuras entregas)
+  viajes          Viaje[]
+  pagos           PagoChofer[]
+
+  @@map("choferes")
+}
+
+model Cliente {
+  id              Int           @id @default(autoincrement())
+  nombreRazonSocial String      @map("nombre_razon_social")
+  documentoId     String        @unique @map("documento_id") // RUC o Cédula
+  telefono        String?
+  correo          String?
+  direccion       String?
+  sector          String?       // Sector comercial (opcional)
+  estado          EstadoCliente @default(ACTIVO)
+  
+  creadoEn        DateTime      @default(now()) @map("creado_en")
+  actualizadoEn   DateTime      @updatedAt @map("actualizado_en")
+
+  // Relaciones (para futuras entregas)
+  viajes          Viaje[]
+
+  @@map("clientes")
+}
+
+model Material {
+  id              Int       @id @default(autoincrement())
+  nombre          String    @unique
+  unidadMedida    String    @map("unidad_medida") // litros, toneladas, etc.
+  esPeligroso     Boolean   @default(false) @map("es_peligroso")
+  descripcion     String?
+  
+  creadoEn        DateTime  @default(now()) @map("creado_en")
+  actualizadoEn   DateTime  @updatedAt @map("actualizado_en")
+
+  // Relaciones (para futuras entregas)
+  viajes          Viaje[]
+
+  @@map("materiales")
+}
+
+// ============================================
+// MODELOS PARA FUTURAS ENTREGAS (Estructura definida)
+// ============================================
+
+model Viaje {
+  id                  Int           @id @default(autoincrement())
+  
+  // Relaciones principales
+  vehiculoId          Int           @map("vehiculo_id")
+  vehiculo            Vehiculo      @relation(fields: [vehiculoId], references: [id])
+  
+  choferId            Int           @map("chofer_id")
+  chofer              Chofer        @relation(fields: [choferId], references: [id])
+  
+  clienteId           Int           @map("cliente_id")
+  cliente             Cliente       @relation(fields: [clienteId], references: [id])
+  
+  materialId          Int           @map("material_id")
+  material            Material      @relation(fields: [materialId], references: [id])
+  
+  // Datos del viaje
+  origen              String
+  destino             String
+  fechaSalida         DateTime      @map("fecha_salida")
+  fechaLlegadaEstimada DateTime?    @map("fecha_llegada_estimada")
+  fechaLlegadaReal    DateTime?     @map("fecha_llegada_real")
+  
+  kilometrosEstimados Int?          @map("kilometros_estimados")
+  kilometrosReales    Int?          @map("kilometros_reales")
+  
+  tarifa              Decimal       @db.Decimal(10, 2) // Lo que se cobra al cliente
+  estado              EstadoViaje   @default(PLANIFICADO)
+  observaciones       String?
+  
+  creadoEn            DateTime      @default(now()) @map("creado_en")
+  actualizadoEn       DateTime      @updatedAt @map("actualizado_en")
+
+  // Relaciones
+  gastos              GastoViaje[]
+
+  @@map("viajes")
+}
+
+model GastoViaje {
+  id              Int         @id @default(autoincrement())
+  
+  viajeId         Int         @map("viaje_id")
+  viaje           Viaje       @relation(fields: [viajeId], references: [id])
+  
+  tipoGasto       TipoGasto   @map("tipo_gasto")
+  monto           Decimal     @db.Decimal(10, 2)
+  fecha           DateTime
+  metodoPago      MetodoPago  @default(EFECTIVO) @map("metodo_pago")
+  descripcion     String?
+  
+  // Comprobante (foto de factura/recibo)
+  urlComprobante  String?     @map("url_comprobante")
+  
+  creadoEn        DateTime    @default(now()) @map("creado_en")
+  actualizadoEn   DateTime    @updatedAt @map("actualizado_en")
+
+  @@map("gastos_viaje")
+}
+
+model Mantenimiento {
+  id                  Int               @id @default(autoincrement())
+  
+  vehiculoId          Int               @map("vehiculo_id")
+  vehiculo            Vehiculo          @relation(fields: [vehiculoId], references: [id])
+  
+  tipo                TipoMantenimiento
+  descripcion         String
+  taller              String            // Nombre del taller
+  esExterno           Boolean           @default(true) @map("es_externo")
+  
+  costoManoObra       Decimal           @default(0) @map("costo_mano_obra") @db.Decimal(10, 2)
+  costoRepuestos      Decimal           @default(0) @map("costo_repuestos") @db.Decimal(10, 2)
+  costoTotal          Decimal           @map("costo_total") @db.Decimal(10, 2)
+  
+  fecha               DateTime
+  kilometrajeAlMomento Int?             @map("kilometraje_al_momento")
+  proximaFecha        DateTime?         @map("proxima_fecha")
+  proximoKilometraje  Int?              @map("proximo_kilometraje")
+  
+  // Comprobante
+  urlComprobante      String?           @map("url_comprobante")
+  
+  creadoEn            DateTime          @default(now()) @map("creado_en")
+  actualizadoEn       DateTime          @updatedAt @map("actualizado_en")
+
+  @@map("mantenimientos")
+}
+
+model PagoChofer {
+  id              Int         @id @default(autoincrement())
+  
+  choferId        Int         @map("chofer_id")
+  chofer          Chofer      @relation(fields: [choferId], references: [id])
+  
+  monto           Decimal     @db.Decimal(10, 2)
+  fecha           DateTime
+  metodoPago      MetodoPago  @default(EFECTIVO) @map("metodo_pago")
+  descripcion     String?     // Ej: "Pago viajes noviembre"
+  
+  // Comprobante
+  urlComprobante  String?     @map("url_comprobante")
+  
+  creadoEn        DateTime    @default(now()) @map("creado_en")
+  actualizadoEn   DateTime    @updatedAt @map("actualizado_en")
+
+  @@map("pagos_choferes")
+}
+
+// ============================================
+// AUDITORÍA - Registro de todos los cambios
+// ============================================
+
+model RegistroAuditoria {
+  id              Int             @id @default(autoincrement())
+  
+  usuarioId       Int             @map("usuario_id")
+  usuario         Usuario         @relation(fields: [usuarioId], references: [id])
+  
+  accion          AccionAuditoria // CREAR, EDITAR, ELIMINAR
+  entidad         String          // Nombre de la tabla: "Vehiculo", "Chofer", etc.
+  entidadId       Int             @map("entidad_id") // ID del registro afectado
+  
+  // Datos del cambio en formato JSON
+  datosAnteriores Json?           @map("datos_anteriores") // Valores antes del cambio
+  datosNuevos     Json?           @map("datos_nuevos")     // Valores después del cambio
+  
+  fechaHora       DateTime        @default(now()) @map("fecha_hora")
+  ipAddress       String?         @map("ip_address")
+
+  @@index([entidad, entidadId])
+  @@index([usuarioId])
+  @@index([fechaHora])
+  @@map("registros_auditoria")
+}

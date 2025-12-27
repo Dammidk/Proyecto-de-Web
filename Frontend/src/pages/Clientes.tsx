@@ -84,26 +84,32 @@ const Clientes = () => {
 
     return (
         <div>
-            <div className="page-header">
+            {/* Page Header & Actions */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
                     <h2 className="page-title">Cartera de Clientes</h2>
                     <p className="page-subtitle">Gestiona información de tus clientes y puntos de llegada.</p>
                 </div>
-                {usuario?.rol === 'ADMIN' && (
-                    <button onClick={() => abrirModal()} className="btn btn-primary"><Plus /> Nuevo Cliente</button>
-                )}
-            </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex items-center">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre o RUC..."
-                        className="pl-10 pr-4 py-2 w-full rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm"
-                        value={filtros.busqueda}
-                        onChange={e => setFiltros({ ...filtros, busqueda: e.target.value })}
-                    />
+                <div className="flex flex-col md:flex-row gap-3 items-center w-full md:w-auto">
+                    {/* Search Toolbar */}
+                    <div className="table-toolbar w-full md:w-auto mb-0">
+                        <div className="search-input-compact">
+                            <Search />
+                            <input
+                                type="text"
+                                placeholder="Nombre o RUC..."
+                                value={filtros.busqueda}
+                                onChange={e => setFiltros({ ...filtros, busqueda: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    {usuario?.rol === 'ADMIN' && (
+                        <button onClick={() => abrirModal()} className="btn btn-primary whitespace-nowrap">
+                            <Plus className="h-4 w-4 mr-2" /> Nuevo Cliente
+                        </button>
+                    )}
                 </div>
             </div>
 

@@ -61,65 +61,58 @@ const Layout = () => {
 
             {/* Sidebar */}
             <aside
-                className={`fixed lg:sticky top-0 left-0 z-30 h-screen w-72 bg-white border-r border-slate-100 transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-20'
+                className={`fixed lg:sticky top-0 left-0 z-30 h-screen w-72 sidebar-dark transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-20'
                     }`}
             >
                 <div className="h-full flex flex-col">
                     {/* Logo Area */}
-                    <div className="h-20 flex items-center px-6 border-b border-slate-50">
-                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${!isSidebarOpen && 'lg:justify-center'}`}>
-                            <div className="bg-indigo-600 rounded-xl p-2 shadow-lg shadow-indigo-500/30">
-                                <Truck className="h-6 w-6 text-white" />
+                    <div className="h-16 flex items-center px-6 border-b border-slate-800/50 mb-2">
+                        <div className={`flex items-center gap-3 transition-opacity duration-300 ${!isSidebarOpen && 'lg:justify-center w-full'}`}>
+                            <div className="bg-indigo-600 rounded-lg p-1.5 shadow-lg shadow-indigo-500/20">
+                                <Truck className="h-5 w-5 text-white" />
                             </div>
                             <div className={`${!isSidebarOpen && 'lg:hidden'}`}>
-                                <h1 className="text-xl font-bold text-slate-900 tracking-tight">Fleet<span className="text-indigo-600">Master</span></h1>
+                                <h1 className="text-lg font-bold text-white tracking-tight">Fleet<span className="text-indigo-400">Master</span></h1>
                             </div>
                         </div>
                     </div>
 
                     {/* Navigation */}
-                    <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
                         {menuItems.map((item) => (
                             <NavLink
                                 key={item.path}
                                 to={item.path}
                                 title={!isSidebarOpen ? item.label : ''}
                                 className={({ isActive }) =>
-                                    `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${isActive
-                                        ? 'bg-indigo-50 text-indigo-700 font-medium shadow-sm ring-1 ring-indigo-100'
-                                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                                    `sidebar-link group ${isActive ? 'active' : ''
                                     } ${!isSidebarOpen ? 'justify-center px-2' : ''}`
                                 }
                             >
-                                <item.icon className={`h-5 w-5 transition-colors ${!isSidebarOpen ? 'w-6 h-6' : ''}`} />
-                                <span className={`${!isSidebarOpen && 'lg:hidden'} text-sm`}>{item.label}</span>
-                                {!isSidebarOpen && (
-                                    <div className="hidden group-hover:block absolute left-20 px-3 py-1.5 bg-slate-800 text-white text-xs rounded-lg shadow-xl whitespace-nowrap z-50">
-                                        {item.label}
-                                    </div>
-                                )}
+                                <item.icon className={`transition-all duration-200 shrink-0 ${!isSidebarOpen ? 'w-7 h-7' : 'w-5 h-5'}`} />
+                                <span className={`${!isSidebarOpen && 'lg:hidden'} font-medium text-sm transition-opacity duration-200`}>{item.label}</span>
                             </NavLink>
                         ))}
                     </nav>
 
                     {/* User Profile */}
-                    <div className="p-4 border-t border-slate-50">
-                        <div className={`bg-slate-50 rounded-2xl p-4 flex items-center justify-between ${!isSidebarOpen ? 'flex-col gap-4 p-2' : ''}`}>
+                    <div className="p-4 border-t border-slate-800/50">
+                        <div className={`flex items-center justify-between transition-all ${!isSidebarOpen ? 'flex-col gap-4 p-2' : 'px-2'}`}>
                             <div className={`flex items-center gap-3 ${!isSidebarOpen ? 'justify-center' : ''}`}>
-                                <div className="bg-white p-2 rounded-full border border-slate-100 shadow-sm">
-                                    <User className="h-5 w-5 text-slate-600" />
+                                <div className="bg-slate-800 p-2 rounded-full">
+                                    <User className="h-4 w-4 text-slate-400" />
                                 </div>
                                 <div className={`${!isSidebarOpen && 'lg:hidden'} overflow-hidden`}>
-                                    <p className="text-sm font-semibold text-slate-900 truncate">{usuario?.nombreCompleto || 'Usuario'}</p>
+                                    <p className="text-sm font-semibold text-slate-200 truncate">{usuario?.nombreCompleto || 'Usuario'}</p>
                                     <p className="text-xs text-slate-500 truncate capitalize">{usuario?.rol.toLowerCase()}</p>
                                 </div>
                             </div>
                             <button
                                 onClick={() => setShowLogoutModal(true)}
                                 title="Cerrar Sesión"
-                                className={`text-slate-400 hover:text-rose-500 transition-colors p-1.5 rounded-lg hover:bg-rose-50 ${!isSidebarOpen ? 'w-full flex justify-center' : ''}`}
+                                className={`text-slate-500 hover:text-rose-400 p-1.5 rounded-lg transition-colors ${!isSidebarOpen ? 'w-full flex justify-center' : ''}`}
                             >
-                                <LogOut className="h-5 w-5" />
+                                <LogOut className="h-4 w-4" />
                             </button>
                         </div>
                     </div>
@@ -129,7 +122,7 @@ const Layout = () => {
             {/* Main Content */}
             <main className="flex-1 flex flex-col min-w-0 transition-all duration-300">
                 {/* Header (Top Bar) */}
-                <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-10 flex items-center justify-between px-8">
+                <header className="glass-header h-20 sticky top-0 z-20 flex items-center justify-between px-8">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -138,10 +131,9 @@ const Layout = () => {
                             <Menu className="h-6 w-6" />
                         </button>
                         {/* Breadcrumb-like title */}
-                        <div className="flex items-center gap-2 text-sm text-slate-500">
-                            <span className="hidden sm:inline">Aplicación</span>
-                            <ChevronRight className="h-4 w-4 hidden sm:inline" />
-                            <span className="font-semibold text-slate-900 text-lg">{getPageTitle()}</span>
+                        {/* Page Title */}
+                        <div className="flex items-center gap-3 text-sm text-slate-500">
+                            <h2 className="font-semibold text-slate-800 text-lg">{getPageTitle()}</h2>
                         </div>
                     </div>
 

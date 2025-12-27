@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { viajeService, gastoService, vehiculoService, choferService, clienteService, materialService } from '../services/api';
 import toast from 'react-hot-toast';
+import LocationInput, { calculateRoute } from '../components/LocationInput';
 import {
     Plus,
     Search,
@@ -122,6 +123,40 @@ export default function Viajes() {
         tarifa: '',
         observaciones: '',
     });
+
+    // Coordenadas para cálculo de ruta
+    const [origenCoords, setOrigenCoords] = useState<{ lat: number; lon: number } | null>(null);
+    const [destinoCoords, setDestinoCoords] = useState<{ lat: number; lon: number } | null>(null);
+    const [rutaCalculada, setRutaCalculada] = useState<{ distance: number; duration: number } | null>(null);
+    const [calculandoRuta, setCalculandoRuta] = useState(false);
+
+    // Calcular ruta cuando ambas coordenadas están disponibles
+    useEffect(() => {
+        if (origenCoords && destinoCoords) {
+            setCalculandoRuta(true);
+            calculateRoute(origenCoords, destinoCoords).then((result) => {
+                setRutaCalculada(result);
+                if (result) {
+                    // Auto-llenar kilómetros estimados
+                    setFormViaje(prev => {
+                        const updates: any = { kilometrosEstimados: result.distance.toString() };
+
+                        // Si hay fecha de salida, calcular fecha de llegada automáticamente
+                        if (prev.fechaSalida) {
+                            const salida = new Date(prev.fechaSalida);
+                            if (!isNaN(salida.getTime())) {
+                                const llegada = new Date(salida.getTime() + result.duration * 60 * 1000);
+                                updates.fechaLlegadaEstimada = llegada.toISOString().slice(0, 16);
+                            }
+                        }
+
+                        return { ...prev, ...updates };
+                    });
+                }
+                setCalculandoRuta(false);
+            });
+        }
+    }, [origenCoords, destinoCoords]);
 
     // Modal de gasto
     const [mostrarModalGasto, setMostrarModalGasto] = useState(false);
@@ -343,20 +378,22 @@ export default function Viajes() {
     if (vista === 'lista') {
         return (
             <div>
-                <div className="page-header">
+
+                {/* Header & Actions */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                     <div>
                         <h2 className="page-title">Gestión de Viajes</h2>
                         <p className="page-subtitle">Planificación, seguimiento y control de transporte.</p>
                     </div>
                     {esAdmin && (
-                        <button onClick={handleNuevoViaje} className="btn btn-primary">
-                            <Plus size={20} /> Nuevo Viaje
+                        <button onClick={handleNuevoViaje} className="btn btn-primary whitespace-nowrap">
+                            <Plus size={18} className="mr-2" /> Nuevo Viaje
                         </button>
                     )}
                 </div>
 
-                {/* Filtros */}
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6">
+                {/* Filtros / Toolbar */}
+                <div className="table-toolbar flex-col items-stretch mb-6 p-4">
                     {/* ... (Keep existing filters code exactly as is) ... */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                         <select
@@ -604,28 +641,7 @@ export default function Viajes() {
                                             Detalles de Ruta
                                         </h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="form-label">Origen</label>
-                                                <input
-                                                    type="text"
-                                                    className="form-input"
-                                                    value={formViaje.origen}
-                                                    onChange={(e) => setFormViaje({ ...formViaje, origen: e.target.value })}
-                                                    required
-                                                    placeholder="Ciudad/Lugar de inicio"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="form-label">Destino</label>
-                                                <input
-                                                    type="text"
-                                                    className="form-input"
-                                                    value={formViaje.destino}
-                                                    onChange={(e) => setFormViaje({ ...formViaje, destino: e.target.value })}
-                                                    required
-                                                    placeholder="Ciudad/Lugar de llegada"
-                                                />
-                                            </div>
+                                            {/* PRIMERO: Fecha y Hora de Salida */}
                                             <div className="md:col-span-2">
                                                 <label className="form-label">Fecha y Hora de Salida</label>
                                                 <div className="grid grid-cols-2 gap-3">
@@ -651,48 +667,95 @@ export default function Viajes() {
                                                     />
                                                 </div>
                                             </div>
-                                            <div className="md:col-span-2">
-                                                <label className="form-label">Fecha y Hora de Llegada Estimada</label>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <input
-                                                        type="date"
-                                                        className="form-input"
-                                                        value={formViaje.fechaLlegadaEstimada?.split('T')[0] || ''}
-                                                        onChange={(e) => {
-                                                            const time = formViaje.fechaLlegadaEstimada?.split('T')[1] || '18:00';
-                                                            setFormViaje({ ...formViaje, fechaLlegadaEstimada: `${e.target.value}T${time}` });
-                                                        }}
-                                                        min={formViaje.fechaSalida?.split('T')[0] || undefined}
-                                                    />
-                                                    <input
-                                                        type="time"
-                                                        className="form-input"
-                                                        value={formViaje.fechaLlegadaEstimada?.split('T')[1] || ''}
-                                                        onChange={(e) => {
-                                                            const date = formViaje.fechaLlegadaEstimada?.split('T')[0] || formViaje.fechaSalida?.split('T')[0] || new Date().toISOString().split('T')[0];
-                                                            setFormViaje({ ...formViaje, fechaLlegadaEstimada: `${date}T${e.target.value}` });
-                                                        }}
-                                                    />
+
+                                            {/* SEGUNDO: Origen y Destino */}
+                                            <LocationInput
+                                                label="Origen"
+                                                value={formViaje.origen}
+                                                placeholder="Ej: Esmeraldas, Ecuador"
+                                                required
+                                                onChange={(value, coords) => {
+                                                    setFormViaje({ ...formViaje, origen: value });
+                                                    if (coords) setOrigenCoords(coords);
+                                                }}
+                                            />
+                                            <LocationInput
+                                                label="Destino"
+                                                value={formViaje.destino}
+                                                placeholder="Ej: Manta, Ecuador"
+                                                required
+                                                onChange={(value, coords) => {
+                                                    setFormViaje({ ...formViaje, destino: value });
+                                                    if (coords) setDestinoCoords(coords);
+                                                }}
+                                            />
+
+                                            {/* Info de ruta calculada */}
+                                            {(calculandoRuta || rutaCalculada) && (
+                                                <div className="md:col-span-2 bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                                                    {calculandoRuta ? (
+                                                        <div className="flex items-center gap-2 text-indigo-600">
+                                                            <div className="spinner h-4 w-4 border-2" />
+                                                            <span className="text-sm">Calculando ruta...</span>
+                                                        </div>
+                                                    ) : rutaCalculada && (
+                                                        <div className="flex items-center justify-around text-center">
+                                                            <div>
+                                                                <p className="text-2xl font-bold text-indigo-600">{rutaCalculada.distance} km</p>
+                                                                <p className="text-xs text-slate-500">Distancia estimada</p>
+                                                            </div>
+                                                            <div className="w-px h-10 bg-indigo-200"></div>
+                                                            <div>
+                                                                <p className="text-2xl font-bold text-indigo-600">
+                                                                    {Math.floor(rutaCalculada.duration / 60)}h {rutaCalculada.duration % 60}m
+                                                                </p>
+                                                                <p className="text-xs text-slate-500">Tiempo estimado</p>
+                                                            </div>
+                                                            {formViaje.fechaLlegadaEstimada && (
+                                                                <>
+                                                                    <div className="w-px h-10 bg-indigo-200"></div>
+                                                                    <div>
+                                                                        <p className="text-lg font-bold text-emerald-600">
+                                                                            {new Date(formViaje.fechaLlegadaEstimada).toLocaleString('es-EC', {
+                                                                                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                                                                            })}
+                                                                        </p>
+                                                                        <p className="text-xs text-slate-500">Llegada estimada</p>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {formViaje.fechaSalida && formViaje.fechaLlegadaEstimada && (
-                                                    <p className="text-xs text-slate-400 mt-2">
-                                                        Duración estimada: {(() => {
-                                                            const salida = new Date(formViaje.fechaSalida);
-                                                            const llegada = new Date(formViaje.fechaLlegadaEstimada);
-                                                            const diff = llegada.getTime() - salida.getTime();
-                                                            if (diff <= 0) return 'Fecha inválida';
-                                                            const horas = Math.floor(diff / (1000 * 60 * 60));
-                                                            const minutos = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                                                            if (horas >= 24) {
-                                                                const dias = Math.floor(horas / 24);
-                                                                const horasRestantes = horas % 24;
-                                                                return `${dias} día(s) ${horasRestantes}h`;
-                                                            }
-                                                            return `${horas}h ${minutos}m`;
-                                                        })()}
-                                                    </p>
-                                                )}
-                                            </div>
+                                            )}
+
+                                            {/* Fecha Llegada (solo visible si no hay cálculo automático) */}
+                                            {!rutaCalculada && (
+                                                <div className="md:col-span-2">
+                                                    <label className="form-label">Fecha y Hora de Llegada Estimada (manual)</label>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <input
+                                                            type="date"
+                                                            className="form-input"
+                                                            value={formViaje.fechaLlegadaEstimada?.split('T')[0] || ''}
+                                                            onChange={(e) => {
+                                                                const time = formViaje.fechaLlegadaEstimada?.split('T')[1] || '18:00';
+                                                                setFormViaje({ ...formViaje, fechaLlegadaEstimada: `${e.target.value}T${time}` });
+                                                            }}
+                                                            min={formViaje.fechaSalida?.split('T')[0] || undefined}
+                                                        />
+                                                        <input
+                                                            type="time"
+                                                            className="form-input"
+                                                            value={formViaje.fechaLlegadaEstimada?.split('T')[1] || ''}
+                                                            onChange={(e) => {
+                                                                const date = formViaje.fechaLlegadaEstimada?.split('T')[0] || formViaje.fechaSalida?.split('T')[0] || new Date().toISOString().split('T')[0];
+                                                                setFormViaje({ ...formViaje, fechaLlegadaEstimada: `${date}T${e.target.value}` });
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 

@@ -96,38 +96,43 @@ const Choferes = () => {
 
     return (
         <div>
-            <div className="page-header">
+
+            {/* Header & Actions Toolbar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                 <div>
                     <h2 className="page-title">Gestión de Choferes</h2>
                     <p className="page-subtitle">Administra tu equipo de conductores y sus pagos.</p>
                 </div>
-                {usuario?.rol === 'ADMIN' && (
-                    <button onClick={() => abrirModal()} className="btn btn-primary">
-                        <Plus /> Nuevo Chofer
-                    </button>
-                )}
-            </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex flex-col md:flex-row gap-4 items-center">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 h-4 w-4" />
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre o documento..."
-                        className="pl-10 pr-4 py-2 w-full rounded-xl border border-slate-200 focus:border-indigo-500 outline-none text-sm"
-                        value={filtros.busqueda}
-                        onChange={e => setFiltros({ ...filtros, busqueda: e.target.value })}
-                    />
+                <div className="flex flex-col md:flex-row gap-3 items-center w-full md:w-auto">
+                    {/* Integrated Search Toolbar */}
+                    <div className="table-toolbar w-full md:w-auto">
+                        <div className="search-input-compact">
+                            <Search />
+                            <input
+                                type="text"
+                                placeholder="Nombre o documento..."
+                                value={filtros.busqueda}
+                                onChange={e => setFiltros({ ...filtros, busqueda: e.target.value })}
+                            />
+                        </div>
+                        <select
+                            className="pl-3 pr-8 py-2 rounded-lg border border-slate-200 outline-none text-sm bg-slate-50 focus:bg-white hover:border-slate-300 transition-all cursor-pointer"
+                            value={filtros.estado}
+                            onChange={e => setFiltros({ ...filtros, estado: e.target.value })}
+                        >
+                            <option value="">Estado: Todos</option>
+                            <option value="ACTIVO">Activo</option>
+                            <option value="INACTIVO">Inactivo</option>
+                        </select>
+                    </div>
+
+                    {usuario?.rol === 'ADMIN' && (
+                        <button onClick={() => abrirModal()} className="btn btn-primary whitespace-nowrap">
+                            <Plus className="h-4 w-4 mr-2" /> Nuevo Chofer
+                        </button>
+                    )}
                 </div>
-                <select
-                    className="px-4 py-2 rounded-xl border border-slate-200 outline-none text-sm bg-white"
-                    value={filtros.estado}
-                    onChange={e => setFiltros({ ...filtros, estado: e.target.value })}
-                >
-                    <option value="">Todos los estados</option>
-                    <option value="ACTIVO">Activo</option>
-                    <option value="INACTIVO">Inactivo</option>
-                </select>
             </div>
 
             <div className="table-container">

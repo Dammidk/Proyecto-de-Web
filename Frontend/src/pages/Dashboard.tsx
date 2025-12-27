@@ -83,8 +83,7 @@ const Dashboard = () => {
             value: `${stats?.vehiculos.activos || 0}`,
             total: `${stats?.vehiculos.total || 0} Total`,
             icon: Truck,
-            color: 'text-blue-600',
-            bg: 'bg-blue-50',
+            colorName: 'blue',
             trend: 'Operativos'
         },
         {
@@ -92,8 +91,7 @@ const Dashboard = () => {
             value: `${stats?.choferes.activos || 0}`,
             total: `${stats?.choferes.total || 0} Total`,
             icon: Users,
-            color: 'text-emerald-600',
-            bg: 'bg-emerald-50',
+            colorName: 'emerald',
             trend: 'En servicio'
         },
         {
@@ -101,8 +99,7 @@ const Dashboard = () => {
             value: `${stats?.clientes.activos || 0}`,
             total: `${stats?.clientes.total || 0} Registrados`,
             icon: BriefcaseBusiness,
-            color: 'text-violet-600',
-            bg: 'bg-violet-50',
+            colorName: 'violet',
             trend: 'Cartera actual'
         },
         {
@@ -110,8 +107,7 @@ const Dashboard = () => {
             value: `${stats?.materiales.total || 0}`,
             total: 'Tipos registrados',
             icon: Package,
-            color: 'text-amber-600',
-            bg: 'bg-amber-50',
+            colorName: 'amber',
             trend: 'Catálogo'
         }
     ];
@@ -127,12 +123,12 @@ const Dashboard = () => {
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {cards.map((card, index) => (
-                    <div key={index} className="card group hover:scale-[1.02] transition-transform duration-300">
+                    <div key={index} className={`card-stat card-stat-${card.colorName}`}>
                         <div className="flex justify-between items-start mb-4">
-                            <div className={`p-3 rounded-2xl ${card.bg} ${card.color} shadow-sm group-hover:shadow-md transition-shadow`}>
-                                <card.icon className="h-6 w-6" />
+                            <div className={`card-stat-icon card-stat-icon-${card.colorName}`}>
+                                <card.icon className="h-7 w-7" />
                             </div>
-                            <span className="flex items-center text-xs font-medium text-slate-400 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+                            <span className="flex items-center text-xs font-medium text-slate-400 bg-slate-50 px-2.5 py-1 rounded-full border border-slate-100">
                                 <Activity className="h-3 w-3 mr-1" />
                                 {card.trend}
                             </span>
@@ -140,8 +136,8 @@ const Dashboard = () => {
                         <div>
                             <h3 className="text-slate-500 text-sm font-medium mb-1">{card.title}</h3>
                             <div className="flex items-baseline gap-2">
-                                <span className="text-3xl font-bold text-slate-900">{card.value}</span>
-                                <span className="text-xs text-slate-400 font-medium">/ {card.total}</span>
+                                <span className="card-stat-value">{card.value}</span>
+                                <span className="text-sm text-slate-400 font-medium">/ {card.total}</span>
                             </div>
                         </div>
                     </div>

@@ -3,8 +3,9 @@ import axios from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
+import { useNavigate } from 'react-router-dom';
 import {
-    Plus, Search, Edit2, Trash2, X, BriefcaseBusiness, MapPin
+    Plus, Search, Edit2, Trash2, X, BriefcaseBusiness, MapPin, Truck
 } from 'lucide-react';
 
 const Clientes = () => {
@@ -17,6 +18,7 @@ const Clientes = () => {
     const [clienteSeleccionado, setClienteSeleccionado] = useState<any>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [clienteToDelete, setClienteToDelete] = useState<number | null>(null);
+    const navigate = useNavigate();
 
     const formInicial = {
         nombreRazonSocial: '', documentoId: '',
@@ -145,6 +147,9 @@ const Clientes = () => {
                                         </td>
                                         <td className="text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => navigate(`/viajes?clienteId=${c.id}`)} className="btn-ghost p-2 rounded-lg" title="Ver Viajes">
+                                                    <Truck className="h-4 w-4 text-slate-400 hover:text-indigo-600" />
+                                                </button>
                                                 {usuario?.rol === 'ADMIN' && (
                                                     <>
                                                         <button onClick={() => abrirModal(c)} className="btn-ghost p-2 rounded-lg"><Edit2 className="text-slate-400 hover:text-amber-600" /></button>

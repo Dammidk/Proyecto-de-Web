@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -12,7 +13,8 @@ import {
     X,
     User,
     Phone,
-    CreditCard
+    CreditCard,
+    Truck
 } from 'lucide-react';
 
 const Choferes = () => {
@@ -25,6 +27,7 @@ const Choferes = () => {
     const [choferSeleccionado, setChoferSeleccionado] = useState<any>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [choferToDelete, setChoferToDelete] = useState<number | null>(null);
+    const navigate = useNavigate();
 
     const formInicial = {
         nombres: '', apellidos: '', documentoId: '',
@@ -178,6 +181,9 @@ const Choferes = () => {
                                         </td>
                                         <td className="text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => navigate(`/viajes?choferId=${c.id}`)} className="btn-ghost p-2 rounded-lg" title="Ver Viajes">
+                                                    <Truck className="h-4 w-4 text-slate-400 hover:text-indigo-600" />
+                                                </button>
                                                 {usuario?.rol === 'ADMIN' && (
                                                     <>
                                                         <button onClick={() => abrirModal(c)} className="btn-ghost p-2 rounded-lg"><Edit2 className="text-slate-400 hover:text-amber-600" /></button>
@@ -194,64 +200,66 @@ const Choferes = () => {
                 )}
             </div>
 
-            {modalOpen && (
-                <div className="modal-overlay">
-                    <div className="modal-content">
-                        <div className="modal-header">
-                            <h3 className="modal-title">{modoEdicion ? 'Editar Chofer' : 'Nuevo Chofer'}</h3>
-                            <button onClick={() => setModalOpen(false)}><X className="text-slate-400 hover:text-rose-500" /></button>
+            {
+                modalOpen && (
+                    <div className="modal-overlay">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h3 className="modal-title">{modoEdicion ? 'Editar Chofer' : 'Nuevo Chofer'}</h3>
+                                <button onClick={() => setModalOpen(false)}><X className="text-slate-400 hover:text-rose-500" /></button>
+                            </div>
+                            <form onSubmit={handleSubmit}>
+                                <div className="modal-body grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label className="form-label">Nombres</label><input required className="form-input" value={formData.nombres} onChange={e => setFormData({ ...formData, nombres: e.target.value })} /></div>
+                                    <div><label className="form-label">Apellidos</label><input required className="form-input" value={formData.apellidos} onChange={e => setFormData({ ...formData, apellidos: e.target.value })} /></div>
+                                    <div><label className="form-label">Documento ID</label><input required className="form-input" value={formData.documentoId} onChange={e => setFormData({ ...formData, documentoId: e.target.value })} /></div>
+                                    <div><label className="form-label">Teléfono</label><input className="form-input" value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: e.target.value })} /></div>
+                                    <div><label className="form-label">Correo (Opcional)</label><input type="email" className="form-input" value={formData.correo} onChange={e => setFormData({ ...formData, correo: e.target.value })} /></div>
+                                    <div>
+                                        <label className="form-label">Estado</label>
+                                        <select className="form-select" value={formData.estado} onChange={e => setFormData({ ...formData, estado: e.target.value })}>
+                                            <option value="ACTIVO">Activo</option>
+                                            <option value="INACTIVO">Inactivo</option>
+                                        </select>
+                                    </div>
+
+                                    <div className="col-span-2 border-t border-slate-100 pt-2"><h4 className="text-sm font-semibold text-slate-700">Información de Pago</h4></div>
+
+                                    <div>
+                                        <label className="form-label">Modalidad</label>
+                                        <select className="form-select" value={formData.modalidadPago} onChange={e => setFormData({ ...formData, modalidadPago: e.target.value })}>
+                                            <option value="POR_VIAJE">Por Viaje</option>
+                                            <option value="MENSUAL">Mensual</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="form-label">Método</label>
+                                        <select className="form-select" value={formData.metodoPago} onChange={e => setFormData({ ...formData, metodoPago: e.target.value })}>
+                                            <option value="EFECTIVO">Efectivo</option>
+                                            <option value="TRANSFERENCIA">Transferencia</option>
+                                        </select>
+                                    </div>
+
+                                    {formData.metodoPago === 'TRANSFERENCIA' && (
+                                        <>
+                                            <div><label className="form-label">Banco</label><input className="form-input" value={formData.banco} onChange={e => setFormData({ ...formData, banco: e.target.value })} /></div>
+                                            <div><label className="form-label">N° Cuenta</label><input className="form-input" value={formData.numeroCuenta} onChange={e => setFormData({ ...formData, numeroCuenta: e.target.value })} /></div>
+                                        </>
+                                    )}
+
+                                    {formData.modalidadPago === 'MENSUAL' && (
+                                        <div><label className="form-label">Sueldo Mensual</label><input type="number" className="form-input" value={formData.sueldoMensual} onChange={e => setFormData({ ...formData, sueldoMensual: parseFloat(e.target.value) })} /></div>
+                                    )}
+                                </div>
+                                <div className="modal-footer">
+                                    <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">Cancelar</button>
+                                    <button type="submit" className="btn btn-primary">Guardar</button>
+                                </div>
+                            </form>
                         </div>
-                        <form onSubmit={handleSubmit}>
-                            <div className="modal-body grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div><label className="form-label">Nombres</label><input required className="form-input" value={formData.nombres} onChange={e => setFormData({ ...formData, nombres: e.target.value })} /></div>
-                                <div><label className="form-label">Apellidos</label><input required className="form-input" value={formData.apellidos} onChange={e => setFormData({ ...formData, apellidos: e.target.value })} /></div>
-                                <div><label className="form-label">Documento ID</label><input required className="form-input" value={formData.documentoId} onChange={e => setFormData({ ...formData, documentoId: e.target.value })} /></div>
-                                <div><label className="form-label">Teléfono</label><input className="form-input" value={formData.telefono} onChange={e => setFormData({ ...formData, telefono: e.target.value })} /></div>
-                                <div><label className="form-label">Correo (Opcional)</label><input type="email" className="form-input" value={formData.correo} onChange={e => setFormData({ ...formData, correo: e.target.value })} /></div>
-                                <div>
-                                    <label className="form-label">Estado</label>
-                                    <select className="form-select" value={formData.estado} onChange={e => setFormData({ ...formData, estado: e.target.value })}>
-                                        <option value="ACTIVO">Activo</option>
-                                        <option value="INACTIVO">Inactivo</option>
-                                    </select>
-                                </div>
-
-                                <div className="col-span-2 border-t border-slate-100 pt-2"><h4 className="text-sm font-semibold text-slate-700">Información de Pago</h4></div>
-
-                                <div>
-                                    <label className="form-label">Modalidad</label>
-                                    <select className="form-select" value={formData.modalidadPago} onChange={e => setFormData({ ...formData, modalidadPago: e.target.value })}>
-                                        <option value="POR_VIAJE">Por Viaje</option>
-                                        <option value="MENSUAL">Mensual</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="form-label">Método</label>
-                                    <select className="form-select" value={formData.metodoPago} onChange={e => setFormData({ ...formData, metodoPago: e.target.value })}>
-                                        <option value="EFECTIVO">Efectivo</option>
-                                        <option value="TRANSFERENCIA">Transferencia</option>
-                                    </select>
-                                </div>
-
-                                {formData.metodoPago === 'TRANSFERENCIA' && (
-                                    <>
-                                        <div><label className="form-label">Banco</label><input className="form-input" value={formData.banco} onChange={e => setFormData({ ...formData, banco: e.target.value })} /></div>
-                                        <div><label className="form-label">N° Cuenta</label><input className="form-input" value={formData.numeroCuenta} onChange={e => setFormData({ ...formData, numeroCuenta: e.target.value })} /></div>
-                                    </>
-                                )}
-
-                                {formData.modalidadPago === 'MENSUAL' && (
-                                    <div><label className="form-label">Sueldo Mensual</label><input type="number" className="form-input" value={formData.sueldoMensual} onChange={e => setFormData({ ...formData, sueldoMensual: parseFloat(e.target.value) })} /></div>
-                                )}
-                            </div>
-                            <div className="modal-footer">
-                                <button type="button" onClick={() => setModalOpen(false)} className="btn btn-secondary">Cancelar</button>
-                                <button type="submit" className="btn btn-primary">Guardar</button>
-                            </div>
-                        </form>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Modal de confirmación */}
             <ConfirmModal
@@ -264,7 +272,7 @@ const Choferes = () => {
                 cancelText="Cancelar"
                 type="danger"
             />
-        </div>
+        </div >
     );
 };
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from '../services/api';
 import { toast } from 'react-hot-toast';
-import { Search, Clock, Shield, X, Eye, FileText } from 'lucide-react';
+import { Clock, Shield, X, FileText } from 'lucide-react';
 
 const Auditoria = () => {
     const [registros, setRegistros] = useState([]);
@@ -45,6 +45,9 @@ const Auditoria = () => {
                     <option value="Chofer">Choferes</option>
                     <option value="Cliente">Clientes</option>
                     <option value="Material">Materiales</option>
+                    <option value="Viaje">Viajes</option>
+                    <option value="GastoViaje">Gastos de Viaje</option>
+                    <option value="Comprobante">Comprobantes</option>
                 </select>
                 <select className="form-select text-sm" value={filtros.accion} onChange={e => setFiltros({ ...filtros, accion: e.target.value })}>
                     <option value="">Todas las Acciones</option>

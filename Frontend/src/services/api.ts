@@ -205,4 +205,81 @@ export const auditoriaService = {
     },
 };
 
+// ==========================================
+// Servicios de Viajes
+// ==========================================
+
+export interface FiltrosViajes {
+    estado?: string;
+    vehiculoId?: number;
+    choferId?: number;
+    clienteId?: number;
+    fechaDesde?: string;
+    fechaHasta?: string;
+    page?: number;
+    limit?: number;
+}
+
+export const viajeService = {
+    listar: async (params?: FiltrosViajes) => {
+        const response = await api.get('/viajes', { params });
+        return response.data;
+    },
+
+    obtener: async (id: number) => {
+        const response = await api.get(`/viajes/${id}`);
+        return response.data;
+    },
+
+    crear: async (viaje: any) => {
+        const response = await api.post('/viajes', viaje);
+        return response.data;
+    },
+
+    actualizar: async (id: number, viaje: any) => {
+        const response = await api.put(`/viajes/${id}`, viaje);
+        return response.data;
+    },
+
+    cambiarEstado: async (id: number, estado: string, datosAdicionales?: { fechaLlegadaReal?: string; kilometrosReales?: number }) => {
+        const response = await api.patch(`/viajes/${id}/estado`, { estado, ...datosAdicionales });
+        return response.data;
+    },
+
+    eliminar: async (id: number) => {
+        const response = await api.delete(`/viajes/${id}`);
+        return response.data;
+    },
+};
+
+// ==========================================
+// Servicios de Gastos de Viaje
+// ==========================================
+
+export const gastoService = {
+    listarPorViaje: async (viajeId: number) => {
+        const response = await api.get(`/viajes/${viajeId}/gastos`);
+        return response.data;
+    },
+
+    crear: async (viajeId: number, formData: FormData) => {
+        const response = await api.post(`/viajes/${viajeId}/gastos`, formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+        return response.data;
+    },
+
+    actualizar: async (id: number, gasto: any) => {
+        const response = await api.put(`/gastos/${id}`, gasto);
+        return response.data;
+    },
+
+    eliminar: async (id: number) => {
+        const response = await api.delete(`/gastos/${id}`);
+        return response.data;
+    },
+};
+
 export default api;

@@ -16,6 +16,8 @@ import clienteRoutes from './routes/cliente.routes';
 import materialRoutes from './routes/material.routes';
 import auditoriaRoutes from './routes/auditoria.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import viajesRoutes from './routes/viajes.routes';
+import gastosRoutes from './routes/gastos.routes';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -38,6 +40,8 @@ app.use('/api/clientes', clienteRoutes);
 app.use('/api/materiales', materialRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/viajes', viajesRoutes);
+app.use('/api/gastos', gastosRoutes);
 
 // Ruta de salud del servidor
 app.get('/api/health', (req, res) => {

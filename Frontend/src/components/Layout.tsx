@@ -12,7 +12,8 @@ import {
     Menu,
     ChevronRight,
     ShieldCheck,
-    User
+    User,
+    Route
 } from 'lucide-react';
 
 const Layout = () => {
@@ -34,6 +35,7 @@ const Layout = () => {
         { path: '/choferes', icon: Users, label: 'Choferes', roles: ['ADMIN', 'AUDITOR'] },
         { path: '/clientes', icon: BriefcaseBusiness, label: 'Clientes', roles: ['ADMIN', 'AUDITOR'] },
         { path: '/materiales', icon: Package, label: 'Materiales', roles: ['ADMIN', 'AUDITOR'] },
+        { path: '/viajes', icon: Route, label: 'Viajes', roles: ['ADMIN', 'AUDITOR'] },
         { path: '/auditoria', icon: ShieldCheck, label: 'Auditoría', roles: ['AUDITOR'] }, // SOLO AUDITOR
     ];
 

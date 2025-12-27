@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +29,7 @@ const Vehiculos = () => {
     const [detalleOpen, setDetalleOpen] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [vehiculoToDelete, setVehiculoToDelete] = useState<number | null>(null);
+    const navigate = useNavigate();
 
     // Formulario inicial
     const formInicial = {
@@ -389,6 +391,18 @@ const Vehiculos = () => {
                                     <p className="text-sm text-amber-800">{vehiculoSeleccionado.observaciones}</p>
                                 </div>
                             )}
+
+                            <div className="pt-4 border-t border-slate-100 flex justify-end">
+                                <button
+                                    onClick={() => {
+                                        setDetalleOpen(false);
+                                        navigate(`/viajes?vehiculoId=${vehiculoSeleccionado.id}`);
+                                    }}
+                                    className="btn btn-outline flex items-center gap-2"
+                                >
+                                    Ver Historial de Viajes
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

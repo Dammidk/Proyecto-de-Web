@@ -39,6 +39,7 @@ enum ModalidadPago {
 enum MetodoPago {
   EFECTIVO
   TRANSFERENCIA
+  TARJETA
 }
 
 enum EstadoCliente {
@@ -65,6 +66,12 @@ enum TipoGasto {
   HOSPEDAJE
   MULTA
   OTRO
+}
+
+enum TipoComprobante {
+  GASTO_VIAJE
+  MANTENIMIENTO
+  PAGO_CHOFER
 }
 
 enum AccionAuditoria {
@@ -228,24 +235,43 @@ model Viaje {
 }
 
 model GastoViaje {
-  id              Int         @id @default(autoincrement())
+  id              Int           @id @default(autoincrement())
   
-  viajeId         Int         @map("viaje_id")
-  viaje           Viaje       @relation(fields: [viajeId], references: [id])
+  viajeId         Int           @map("viaje_id")
+  viaje           Viaje         @relation(fields: [viajeId], references: [id])
   
-  tipoGasto       TipoGasto   @map("tipo_gasto")
-  monto           Decimal     @db.Decimal(10, 2)
+  tipoGasto       TipoGasto     @map("tipo_gasto")
+  monto           Decimal       @db.Decimal(10, 2)
   fecha           DateTime
-  metodoPago      MetodoPago  @default(EFECTIVO) @map("metodo_pago")
+  metodoPago      MetodoPago    @default(EFECTIVO) @map("metodo_pago")
   descripcion     String?
   
-  // Comprobante (foto de factura/recibo)
-  urlComprobante  String?     @map("url_comprobante")
+  // Relación con Comprobante (foto de factura/recibo)
+  comprobanteId   Int?          @map("comprobante_id")
+  comprobante     Comprobante?  @relation(fields: [comprobanteId], references: [id])
   
-  creadoEn        DateTime    @default(now()) @map("creado_en")
-  actualizadoEn   DateTime    @updatedAt @map("actualizado_en")
+  creadoEn        DateTime      @default(now()) @map("creado_en")
+  actualizadoEn   DateTime      @updatedAt @map("actualizado_en")
 
   @@map("gastos_viaje")
+}
+
+model Comprobante {
+  id                    Int               @id @default(autoincrement())
+  
+  tipo                  TipoComprobante   // GASTO_VIAJE, MANTENIMIENTO, PAGO_CHOFER
+  referenciaId          Int?              @map("referencia_id") // ID del registro asociado (para referencia inversa)
+  
+  url                   String            // URL pública de Cloudinary
+  publicId              String            @map("public_id") // ID interno de Cloudinary
+  nombreArchivoOriginal String            @map("nombre_archivo_original")
+  
+  creadoEn              DateTime          @default(now()) @map("creado_en")
+
+  // Relaciones
+  gastosViaje           GastoViaje[]
+
+  @@map("comprobantes")
 }
 
 model Mantenimiento {

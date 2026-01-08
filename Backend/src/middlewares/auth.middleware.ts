@@ -4,6 +4,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { RolUsuario } from '@prisma/client';
+import env from '../config/env';
 
 // Extender el tipo Request para incluir el usuario autenticado
 declare global {
@@ -42,9 +43,7 @@ export const verificarToken = (req: Request, res: Response, next: NextFunction):
         }
 
         const token = partes[1];
-        const secreto = process.env.JWT_SECRET || 'secreto_por_defecto';
-
-        const decoded = jwt.verify(token, secreto) as PayloadJWT;
+        const decoded = jwt.verify(token, env.jwtSecret) as PayloadJWT;
 
         // Adjuntar información del usuario al request
         req.usuario = {

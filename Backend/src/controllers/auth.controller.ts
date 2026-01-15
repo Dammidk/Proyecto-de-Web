@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { usuarioService } from '../services/usuario.service';
 import { usuarioRepository } from '../repositories/usuario.repository';
+import env from '../config/env';
 
 // Schema de validación para login
 const loginSchema = z.object({
@@ -40,12 +41,12 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         }
 
         const token = jwt.sign(
-            { id: usuario.id, rol: usuario.rol },
-            process.env.JWT_SECRET || 'secret',
-            { expiresIn: '24h' }
+            { id: usuario.id, nombreUsuario: usuario.nombreUsuario, rol: usuario.rol },
+            env.jwtSecret,
+            { expiresIn: env.jwtExpiresIn as jwt.SignOptions['expiresIn'] }
         );
 
-        console.log(`✅ Login exitoso: ${usuario.nombreUsuario} (${usuario.rol})`);
+        console.log(`Login exitoso: ${usuario.nombreUsuario} (${usuario.rol})`);
 
         res.json({
             mensaje: 'Login exitoso',
@@ -73,8 +74,8 @@ export const obtenerPerfil = async (req: Request, res: Response): Promise<void> 
         }
 
         const usuario = await usuarioRepository.findById(req.usuario.id);
-        if (!usuario) {
-            res.status(404).json({ error: 'Usuario no encontrado' });
+        if (!usuario || !usuario.activo) {
+            res.status(401).json({ error: 'Usuario no encontrado o desactivado' });
             return;
         }
 

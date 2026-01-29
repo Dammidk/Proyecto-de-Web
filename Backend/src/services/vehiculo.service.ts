@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { AccionAuditoria } from '@prisma/client';
 import { vehiculoRepository, FiltrosVehiculo } from '../repositories/vehiculo.repository';
 import { auditoriaRepository } from '../repositories/auditoria.repository';
+import { empresaService } from './empresa.service';
+import { ConflictError, NotFoundError } from '../utils/errors';
 
 // Schema de validación Zod
 export const vehiculoSchema = z.object({
@@ -12,15 +14,21 @@ export const vehiculoSchema = z.object({
     anio: z.coerce.number().min(1900).max(new Date().getFullYear() + 1),
     tipo: z.string().min(1, 'Tipo requerido'),
     capacidad: z.string().min(1, 'Capacidad requerida'),
-    estado: z.enum(['ACTIVO', 'EN_RUTA', 'EN_MANTENIMIENTO', 'INACTIVO']).optional().default('ACTIVO'),
-    kilometrajeActual: z.coerce.number().min(0).optional().default(0),
+    estado: z.enum(['ACTIVO', 'EN_RUTA', 'EN_MANTENIMIENTO', 'INACTIVO']).optional(),
+    kilometrajeActual: z.coerce.number().int().min(0).optional(),
     observaciones: z.string().optional().nullable(),
     fechaUltimoMantenimiento: z.string().optional().nullable(),
     fechaProximoMantenimiento: z.string().optional().nullable(),
     fechaVencimientoSoat: z.string().optional().nullable(),
     fechaVencimientoSeguro: z.string().optional().nullable(),
-    fechaVencimientoMatricula: z.string().optional().nullable()
+    fechaVencimientoMatricula: z.string().optional().nullable(),
+    fechaVencimientoRevisionTecnica: z.string().optional().nullable(),
+    rendimientoEsperadoKmGal: z.union([z.literal(''), z.null(), z.coerce.number().positive().max(100)]).optional()
+        .transform(v => (v === '' ? null : v)),
 });
+
+// En la edición todos los campos son opcionales (sin valores por defecto que pisen los actuales)
+export const vehiculoUpdateSchema = vehiculoSchema.partial();
 
 export type VehiculoInput = z.infer<typeof vehiculoSchema>;
 
@@ -40,8 +48,11 @@ export const vehiculoService = {
         // Verificar unicidad de placa
         const existente = await vehiculoRepository.findByPlaca(placaNormalizada);
         if (existente) {
-            throw new Error(`Ya existe un vehículo con la placa ${placaNormalizada}`);
+            throw new ConflictError(`Ya existe un vehículo con la placa ${placaNormalizada}`);
         }
+
+        // El plan de la organización limita el tamaño de la flota
+        await empresaService.verificarCupoVehiculos();
 
         // Preparar datos para guardar
         const dataToSave = {
@@ -58,7 +69,9 @@ export const vehiculoService = {
             fechaProximoMantenimiento: datos.fechaProximoMantenimiento ? new Date(datos.fechaProximoMantenimiento) : null,
             fechaVencimientoSoat: datos.fechaVencimientoSoat ? new Date(datos.fechaVencimientoSoat) : null,
             fechaVencimientoSeguro: datos.fechaVencimientoSeguro ? new Date(datos.fechaVencimientoSeguro) : null,
-            fechaVencimientoMatricula: datos.fechaVencimientoMatricula ? new Date(datos.fechaVencimientoMatricula) : null
+            fechaVencimientoMatricula: datos.fechaVencimientoMatricula ? new Date(datos.fechaVencimientoMatricula) : null,
+            fechaVencimientoRevisionTecnica: datos.fechaVencimientoRevisionTecnica ? new Date(datos.fechaVencimientoRevisionTecnica) : null,
+            rendimientoEsperadoKmGal: datos.rendimientoEsperadoKmGal ?? null
         };
 
         const vehiculo = await vehiculoRepository.create(dataToSave);
@@ -78,12 +91,17 @@ export const vehiculoService = {
     async actualizar(id: number, datos: Partial<VehiculoInput>, usuarioId: number, ip?: string) {
         // Obtener datos anteriores
         const anterior = await vehiculoRepository.findById(id);
-        if (!anterior) throw new Error('Vehículo no encontrado');
+        if (!anterior) throw new NotFoundError('Vehículo no encontrado');
 
         // Verificar placa única si cambió
         if (datos.placa && datos.placa.toUpperCase() !== anterior.placa) {
             const existente = await vehiculoRepository.findByPlaca(datos.placa.toUpperCase());
-            if (existente) throw new Error(`La placa ${datos.placa} ya está en uso`);
+            if (existente) throw new ConflictError(`La placa ${datos.placa} ya está en uso`);
+        }
+
+        // El odómetro nunca retrocede
+        if (datos.kilometrajeActual !== undefined && datos.kilometrajeActual < anterior.kilometrajeActual) {
+            throw new ConflictError(`El kilometraje no puede ser menor al actual (${anterior.kilometrajeActual} km)`);
         }
 
         // Preparar datos para actualizar
@@ -97,9 +115,10 @@ export const vehiculoService = {
         if (datos.estado) dataToUpdate.estado = datos.estado;
         if (datos.kilometrajeActual !== undefined) dataToUpdate.kilometrajeActual = datos.kilometrajeActual;
         if (datos.observaciones !== undefined) dataToUpdate.observaciones = datos.observaciones;
+        if (datos.rendimientoEsperadoKmGal !== undefined) dataToUpdate.rendimientoEsperadoKmGal = datos.rendimientoEsperadoKmGal;
 
         // Fechas
-        ['fechaUltimoMantenimiento', 'fechaProximoMantenimiento', 'fechaVencimientoSoat', 'fechaVencimientoSeguro', 'fechaVencimientoMatricula'].forEach(f => {
+        ['fechaUltimoMantenimiento', 'fechaProximoMantenimiento', 'fechaVencimientoSoat', 'fechaVencimientoSeguro', 'fechaVencimientoMatricula', 'fechaVencimientoRevisionTecnica'].forEach(f => {
             if ((datos as any)[f] !== undefined) {
                 dataToUpdate[f] = (datos as any)[f] ? new Date((datos as any)[f]) : null;
             }
@@ -122,7 +141,7 @@ export const vehiculoService = {
 
     async eliminar(id: number, usuarioId: number, ip?: string) {
         const vehiculo = await vehiculoRepository.findById(id);
-        if (!vehiculo) throw new Error('Vehículo no encontrado');
+        if (!vehiculo) throw new NotFoundError('Vehículo no encontrado');
 
         await vehiculoRepository.delete(id);
 

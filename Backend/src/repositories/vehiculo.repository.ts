@@ -1,6 +1,6 @@
 // Repositorio de Vehículos - Acceso a BD
-import prisma from '../config/database';
-import { EstadoVehiculo } from '@prisma/client';
+import prisma, { Db } from '../config/database';
+import { EstadoVehiculo, Prisma } from '@prisma/client';
 
 export interface FiltrosVehiculo {
     busqueda?: string;
@@ -9,7 +9,7 @@ export interface FiltrosVehiculo {
 
 export const vehiculoRepository = {
     async findAll(filtros: FiltrosVehiculo = {}) {
-        const where: any = {};
+        const where: Prisma.VehiculoWhereInput = {};
         if (filtros.busqueda) {
             where.OR = [
                 { placa: { contains: filtros.busqueda, mode: 'insensitive' } },
@@ -21,24 +21,24 @@ export const vehiculoRepository = {
         return prisma.vehiculo.findMany({ where, orderBy: { placa: 'asc' } });
     },
 
-    async findById(id: number) {
-        return prisma.vehiculo.findUnique({ where: { id } });
+    async findById(id: number, db: Db = prisma) {
+        return db.vehiculo.findUnique({ where: { id } });
     },
 
     async findByPlaca(placa: string) {
         return prisma.vehiculo.findUnique({ where: { placa } });
     },
 
-    async create(data: any) {
-        return prisma.vehiculo.create({ data });
+    async create(data: Prisma.VehiculoCreateInput, db: Db = prisma) {
+        return db.vehiculo.create({ data });
     },
 
-    async update(id: number, data: any) {
-        return prisma.vehiculo.update({ where: { id }, data });
+    async update(id: number, data: Prisma.VehiculoUpdateInput, db: Db = prisma) {
+        return db.vehiculo.update({ where: { id }, data });
     },
 
-    async delete(id: number) {
-        return prisma.vehiculo.delete({ where: { id } });
+    async delete(id: number, db: Db = prisma) {
+        return db.vehiculo.delete({ where: { id } });
     },
 
     async countActivos() {
@@ -47,5 +47,18 @@ export const vehiculoRepository = {
 
     async countTotal() {
         return prisma.vehiculo.count();
-    }
+    },
+
+    // Vehículos operativos con sus fechas de vencimiento (para el semáforo documental)
+    async findParaCumplimiento() {
+        return prisma.vehiculo.findMany({
+            where: { estado: { not: EstadoVehiculo.INACTIVO } },
+            select: {
+                id: true, placa: true, marca: true, modelo: true, estado: true,
+                fechaVencimientoSoat: true, fechaVencimientoSeguro: true,
+                fechaVencimientoMatricula: true, fechaVencimientoRevisionTecnica: true,
+            },
+            orderBy: { placa: 'asc' },
+        });
+    },
 };

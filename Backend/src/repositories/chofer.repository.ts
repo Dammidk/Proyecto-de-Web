@@ -1,5 +1,5 @@
 // Repositorio de Choferes - Acceso a BD
-import prisma from '../config/database';
+import prisma, { Db } from '../config/database';
 import { EstadoChofer } from '@prisma/client';
 
 export interface FiltrosChofer {
@@ -21,8 +21,8 @@ export const choferRepository = {
         return prisma.chofer.findMany({ where, orderBy: { apellidos: 'asc' } });
     },
 
-    async findById(id: number) {
-        return prisma.chofer.findUnique({ where: { id } });
+    async findById(id: number, db: Db = prisma) {
+        return db.chofer.findUnique({ where: { id } });
     },
 
     async findByDocumento(documentoId: string) {
@@ -47,5 +47,17 @@ export const choferRepository = {
 
     async countTotal() {
         return prisma.chofer.count();
+    },
+
+    // Choferes activos con su licencia (para el semáforo documental)
+    async findParaCumplimiento() {
+        return prisma.chofer.findMany({
+            where: { estado: 'ACTIVO' },
+            select: {
+                id: true, nombres: true, apellidos: true, documentoId: true,
+                licenciaTipo: true, fechaVencimientoLicencia: true,
+            },
+            orderBy: { apellidos: 'asc' },
+        });
     }
 };

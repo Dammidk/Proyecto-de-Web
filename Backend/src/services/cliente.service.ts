@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AccionAuditoria } from '@prisma/client';
 import { clienteRepository, FiltrosCliente } from '../repositories/cliente.repository';
 import { auditoriaRepository } from '../repositories/auditoria.repository';
+import { ConflictError, NotFoundError } from '../utils/errors';
 
 export const clienteSchema = z.object({
     nombreRazonSocial: z.string().min(1, 'Nombre o razón social requerido'),
@@ -11,8 +12,11 @@ export const clienteSchema = z.object({
     correo: z.string().email().optional().nullable().or(z.literal('')),
     direccion: z.string().optional().nullable(),
     sector: z.string().optional().nullable(),
-    estado: z.enum(['ACTIVO', 'INACTIVO']).optional().default('ACTIVO')
+    estado: z.enum(['ACTIVO', 'INACTIVO']).optional()
 });
+
+// En la edición todos los campos son opcionales (sin valores por defecto que pisen los actuales)
+export const clienteUpdateSchema = clienteSchema.partial();
 
 export type ClienteInput = z.infer<typeof clienteSchema>;
 
@@ -28,7 +32,7 @@ export const clienteService = {
     async crear(datos: ClienteInput, usuarioId: number, ip?: string) {
         const docNormalizado = datos.documentoId.trim();
         const existente = await clienteRepository.findByDocumento(docNormalizado);
-        if (existente) throw new Error(`Ya existe un cliente con el documento ${docNormalizado}`);
+        if (existente) throw new ConflictError(`Ya existe un cliente con el documento ${docNormalizado}`);
 
         const dataToSave = {
             nombreRazonSocial: datos.nombreRazonSocial.trim(),
@@ -55,11 +59,11 @@ export const clienteService = {
 
     async actualizar(id: number, datos: Partial<ClienteInput>, usuarioId: number, ip?: string) {
         const anterior = await clienteRepository.findById(id);
-        if (!anterior) throw new Error('Cliente no encontrado');
+        if (!anterior) throw new NotFoundError('Cliente no encontrado');
 
         if (datos.documentoId && datos.documentoId !== anterior.documentoId) {
             const existente = await clienteRepository.findByDocumento(datos.documentoId);
-            if (existente) throw new Error(`El documento ${datos.documentoId} ya está en uso`);
+            if (existente) throw new ConflictError(`El documento ${datos.documentoId} ya está en uso`);
         }
 
         const dataToUpdate: any = {};
@@ -87,7 +91,7 @@ export const clienteService = {
 
     async eliminar(id: number, usuarioId: number, ip?: string) {
         const cliente = await clienteRepository.findById(id);
-        if (!cliente) throw new Error('Cliente no encontrado');
+        if (!cliente) throw new NotFoundError('Cliente no encontrado');
 
         await clienteRepository.delete(id);
 

@@ -3,13 +3,17 @@ import { z } from 'zod';
 import { AccionAuditoria } from '@prisma/client';
 import { materialRepository, FiltrosMaterial } from '../repositories/material.repository';
 import { auditoriaRepository } from '../repositories/auditoria.repository';
+import { ConflictError, NotFoundError } from '../utils/errors';
 
 export const materialSchema = z.object({
     nombre: z.string().min(1, 'Nombre requerido'),
     unidadMedida: z.string().min(1, 'Unidad de medida requerida'),
-    esPeligroso: z.boolean().optional().default(false),
+    esPeligroso: z.boolean().optional(),
     descripcion: z.string().optional().nullable()
 });
+
+// En la edición todos los campos son opcionales (sin valores por defecto que pisen los actuales)
+export const materialUpdateSchema = materialSchema.partial();
 
 export type MaterialInput = z.infer<typeof materialSchema>;
 
@@ -25,7 +29,7 @@ export const materialService = {
     async crear(datos: MaterialInput, usuarioId: number, ip?: string) {
         const nombreNormalizado = datos.nombre.trim();
         const existente = await materialRepository.findByNombre(nombreNormalizado);
-        if (existente) throw new Error(`Ya existe un material con el nombre ${nombreNormalizado}`);
+        if (existente) throw new ConflictError(`Ya existe un material con el nombre ${nombreNormalizado}`);
 
         const dataToSave = {
             nombre: nombreNormalizado,
@@ -49,11 +53,11 @@ export const materialService = {
 
     async actualizar(id: number, datos: Partial<MaterialInput>, usuarioId: number, ip?: string) {
         const anterior = await materialRepository.findById(id);
-        if (!anterior) throw new Error('Material no encontrado');
+        if (!anterior) throw new NotFoundError('Material no encontrado');
 
         if (datos.nombre && datos.nombre !== anterior.nombre) {
             const existente = await materialRepository.findByNombre(datos.nombre);
-            if (existente) throw new Error(`El nombre ${datos.nombre} ya está en uso`);
+            if (existente) throw new ConflictError(`El nombre ${datos.nombre} ya está en uso`);
         }
 
         const dataToUpdate: any = {};
@@ -78,7 +82,7 @@ export const materialService = {
 
     async eliminar(id: number, usuarioId: number, ip?: string) {
         const material = await materialRepository.findById(id);
-        if (!material) throw new Error('Material no encontrado');
+        if (!material) throw new NotFoundError('Material no encontrado');
 
         await materialRepository.delete(id);
 

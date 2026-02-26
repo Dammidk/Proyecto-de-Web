@@ -20,6 +20,9 @@ router.get('/', viajesController.listar);
 // GET /api/viajes/:id - Detalle de viaje con gastos y rentabilidad
 router.get('/:id', viajesController.obtenerDetalle);
 
+// GET /api/viajes/:id/liquidacion - Hoja de liquidación (anticipos vs. gastos)
+router.get('/:id/liquidacion', viajesController.obtenerLiquidacion);
+
 // POST /api/viajes - Crear viaje (solo admin)
 router.post('/', soloAdmin, viajesController.crear);
 

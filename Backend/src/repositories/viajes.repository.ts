@@ -1,5 +1,5 @@
 // Repositorio de Viajes - Acceso a BD
-import prisma from '../config/database';
+import prisma, { Db } from '../config/database';
 import { EstadoViaje, Prisma } from '@prisma/client';
 
 export interface FiltrosViajes {
@@ -9,6 +9,7 @@ export interface FiltrosViajes {
     clienteId?: number;
     fechaDesde?: Date;
     fechaHasta?: Date;
+    busqueda?: string;
     skip?: number;
     take?: number;
 }
@@ -21,24 +22,49 @@ export interface DatosCrearViaje {
     origen: string;
     destino: string;
     fechaSalida: Date;
-    fechaLlegadaEstimada?: Date;
-    kilometrosEstimados?: number;
+    fechaLlegadaEstimada?: Date | null;
+    kilometrosEstimados?: number | null;
     tarifa: number;
-    observaciones?: string;
+    observaciones?: string | null;
 }
 
 export interface DatosActualizarViaje {
+    vehiculoId?: number;
+    choferId?: number;
+    clienteId?: number;
+    materialId?: number;
     origen?: string;
     destino?: string;
     fechaSalida?: Date;
-    fechaLlegadaEstimada?: Date;
-    fechaLlegadaReal?: Date;
-    kilometrosEstimados?: number;
-    kilometrosReales?: number;
+    fechaLlegadaEstimada?: Date | null;
+    fechaLlegadaReal?: Date | null;
+    kilometrosEstimados?: number | null;
+    kilometrosReales?: number | null;
     tarifa?: number;
-    observaciones?: string;
+    observaciones?: string | null;
     estado?: EstadoViaje;
 }
+
+const includeListado = {
+    vehiculo: { select: { id: true, placa: true, marca: true, modelo: true } },
+    chofer: { select: { id: true, nombres: true, apellidos: true, telefono: true } },
+    cliente: { select: { id: true, nombreRazonSocial: true } },
+    material: { select: { id: true, nombre: true, esPeligroso: true } },
+} satisfies Prisma.ViajeInclude;
+
+const includeDetalle = {
+    vehiculo: { select: { id: true, placa: true, marca: true, modelo: true, tipo: true, capacidad: true, rendimientoEsperadoKmGal: true } },
+    chofer: { select: { id: true, nombres: true, apellidos: true, documentoId: true, telefono: true, correo: true, licenciaTipo: true } },
+    cliente: { select: { id: true, nombreRazonSocial: true, documentoId: true, telefono: true, correo: true, direccion: true } },
+    material: { select: { id: true, nombre: true, unidadMedida: true, esPeligroso: true } },
+    gastos: {
+        include: { comprobante: true },
+        orderBy: { fecha: 'desc' },
+    },
+    pagosChofer: { orderBy: { fecha: 'desc' } },
+} satisfies Prisma.ViajeInclude;
+
+export type ViajeDetalle = Prisma.ViajeGetPayload<{ include: typeof includeDetalle }>;
 
 export const viajesRepository = {
     async findAll(filtros: FiltrosViajes = {}) {
@@ -55,15 +81,21 @@ export const viajesRepository = {
             if (filtros.fechaHasta) where.fechaSalida.lte = filtros.fechaHasta;
         }
 
+        if (filtros.busqueda) {
+            const q = { contains: filtros.busqueda, mode: 'insensitive' as const };
+            where.OR = [
+                { origen: q },
+                { destino: q },
+                { vehiculo: { placa: q } },
+                { cliente: { nombreRazonSocial: q } },
+                { chofer: { OR: [{ nombres: q }, { apellidos: q }] } },
+            ];
+        }
+
         const [viajes, total] = await Promise.all([
             prisma.viaje.findMany({
                 where,
-                include: {
-                    vehiculo: { select: { id: true, placa: true, marca: true, modelo: true } },
-                    chofer: { select: { id: true, nombres: true, apellidos: true, telefono: true } },
-                    cliente: { select: { id: true, nombreRazonSocial: true } },
-                    material: { select: { id: true, nombre: true } },
-                },
+                include: includeListado,
                 orderBy: { fechaSalida: 'desc' },
                 skip: filtros.skip || 0,
                 take: filtros.take || 50,
@@ -74,26 +106,15 @@ export const viajesRepository = {
         return { viajes, total };
     },
 
-    async findById(id: number) {
-        return prisma.viaje.findUnique({
+    async findById(id: number, db: Db = prisma): Promise<ViajeDetalle | null> {
+        return db.viaje.findUnique({
             where: { id },
-            include: {
-                vehiculo: { select: { id: true, placa: true, marca: true, modelo: true, tipo: true } },
-                chofer: { select: { id: true, nombres: true, apellidos: true, telefono: true, correo: true } },
-                cliente: { select: { id: true, nombreRazonSocial: true, telefono: true, correo: true } },
-                material: { select: { id: true, nombre: true, unidadMedida: true, esPeligroso: true } },
-                gastos: {
-                    include: {
-                        comprobante: true,
-                    },
-                    orderBy: { fecha: 'desc' },
-                },
-            },
+            include: includeDetalle,
         });
     },
 
-    async create(datos: DatosCrearViaje) {
-        return prisma.viaje.create({
+    async create(datos: DatosCrearViaje, db: Db = prisma) {
+        return db.viaje.create({
             data: {
                 vehiculoId: datos.vehiculoId,
                 choferId: datos.choferId,
@@ -102,48 +123,55 @@ export const viajesRepository = {
                 origen: datos.origen,
                 destino: datos.destino,
                 fechaSalida: datos.fechaSalida,
-                fechaLlegadaEstimada: datos.fechaLlegadaEstimada,
-                kilometrosEstimados: datos.kilometrosEstimados,
+                fechaLlegadaEstimada: datos.fechaLlegadaEstimada ?? null,
+                kilometrosEstimados: datos.kilometrosEstimados ?? null,
                 tarifa: datos.tarifa,
-                observaciones: datos.observaciones,
+                observaciones: datos.observaciones ?? null,
                 estado: EstadoViaje.PLANIFICADO,
             },
+            include: includeListado,
         });
     },
 
-    async update(id: number, datos: DatosActualizarViaje) {
-        return prisma.viaje.update({
+    async update(id: number, datos: DatosActualizarViaje, db: Db = prisma) {
+        return db.viaje.update({
             where: { id },
             data: datos,
+            include: includeListado,
         });
     },
 
-    async delete(id: number) {
-        return prisma.viaje.delete({ where: { id } });
+    async delete(id: number, db: Db = prisma) {
+        return db.viaje.delete({ where: { id } });
     },
 
-    // Verificar que existan entidades relacionadas
-    async validarEntidadesRelacionadas(vehiculoId: number, choferId: number, clienteId: number, materialId: number) {
+    // Entidades necesarias para validar una asignación (estado, documentos y licencia)
+    async obtenerEntidadesAsignacion(vehiculoId: number, choferId: number, clienteId: number, materialId: number, db: Db = prisma) {
         const [vehiculo, chofer, cliente, material] = await Promise.all([
-            prisma.vehiculo.findFirst({ where: { id: vehiculoId, estado: 'ACTIVO' } }),
-            prisma.chofer.findFirst({ where: { id: choferId, estado: 'ACTIVO' } }),
-            prisma.cliente.findFirst({ where: { id: clienteId, estado: 'ACTIVO' } }),
-            prisma.material.findUnique({ where: { id: materialId } }),
+            db.vehiculo.findUnique({ where: { id: vehiculoId } }),
+            db.chofer.findUnique({ where: { id: choferId } }),
+            db.cliente.findUnique({ where: { id: clienteId } }),
+            db.material.findUnique({ where: { id: materialId } }),
         ]);
+        return { vehiculo, chofer, cliente, material };
+    },
 
-        const errores: string[] = [];
-        if (!vehiculo) errores.push('Vehículo no encontrado o inactivo');
-        if (!chofer) errores.push('Chofer no encontrado o inactivo');
-        if (!cliente) errores.push('Cliente no encontrado o inactivo');
-        if (!material) errores.push('Material no encontrado');
-
-        return { valido: errores.length === 0, errores };
+    // Otro viaje EN_CURSO que use el mismo vehículo o chofer (evita doble asignación simultánea)
+    async buscarViajeEnCursoConflicto(vehiculoId: number, choferId: number, excluirViajeId: number, db: Db = prisma) {
+        return db.viaje.findFirst({
+            where: {
+                estado: EstadoViaje.EN_CURSO,
+                id: { not: excluirViajeId },
+                OR: [{ vehiculoId }, { choferId }],
+            },
+            select: { id: true, vehiculoId: true, choferId: true, origen: true, destino: true },
+        });
     },
 
     // Estadísticas para dashboard
     async getEstadisticasMensuales(anio: number, mes: number) {
         const inicioMes = new Date(anio, mes - 1, 1);
-        const finMes = new Date(anio, mes, 0, 23, 59, 59);
+        const finMes = new Date(anio, mes, 0, 23, 59, 59, 999);
 
         const [viajesCompletados, totalViajes] = await Promise.all([
             prisma.viaje.findMany({
@@ -151,11 +179,12 @@ export const viajesRepository = {
                     estado: EstadoViaje.COMPLETADO,
                     fechaSalida: { gte: inicioMes, lte: finMes },
                 },
-                select: { tarifa: true },
+                select: { tarifa: true, kilometrosReales: true },
             }),
             prisma.viaje.count({
                 where: {
                     fechaSalida: { gte: inicioMes, lte: finMes },
+                    estado: { not: EstadoViaje.CANCELADO },
                 },
             }),
         ]);
@@ -164,11 +193,16 @@ export const viajesRepository = {
             (sum, v) => sum + Number(v.tarifa),
             0
         );
+        const kilometrosRecorridos = viajesCompletados.reduce(
+            (sum, v) => sum + (v.kilometrosReales || 0),
+            0
+        );
 
         return {
             totalViajes,
             viajesCompletados: viajesCompletados.length,
             ingresosTotales,
+            kilometrosRecorridos,
         };
     },
 };

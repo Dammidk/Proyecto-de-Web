@@ -1,157 +1,152 @@
 // Servicio de Gastos de Viaje - Lógica de negocio
-import { TipoGasto, MetodoPago, TipoComprobante, AccionAuditoria } from '@prisma/client';
-import { gastosRepository, DatosCrearGasto } from '../repositories/gastos.repository';
+import { TipoGasto, TipoComprobante, AccionAuditoria, EstadoViaje } from '@prisma/client';
+import { enTransaccion } from '../config/database';
+import { gastosRepository, DatosCrearGasto, DatosActualizarGasto } from '../repositories/gastos.repository';
 import { viajesRepository } from '../repositories/viajes.repository';
 import { auditoriaRepository } from '../repositories/auditoria.repository';
-import { uploadToCloudinary, deleteFromCloudinary } from './cloudinary.service';
+import { storageService } from './storage.service';
+import { r2 } from '../domain/finanzas';
+import { ConflictError, NotFoundError, ValidationError } from '../utils/errors';
 
-export interface DatosCrearGastoConArchivo {
-    viajeId: number;
-    tipoGasto: TipoGasto;
-    monto: number;
-    fecha: Date;
-    metodoPago?: MetodoPago;
-    descripcion?: string;
-    archivo?: {
-        buffer: Buffer;
-        originalname: string;
-    };
+export interface DatosCrearGastoConArchivo extends DatosCrearGasto {
+    archivo?: Express.Multer.File;
 }
+
+/**
+ * Normaliza los datos de combustible:
+ * - Solo los gastos COMBUSTIBLE guardan galones, precio, estación y kilometraje
+ * - Si hay galones pero no precio por galón, se calcula como monto / galones
+ */
+const normalizarCombustible = <T extends DatosActualizarGasto>(datos: T, tipoGasto: TipoGasto, monto?: number): T => {
+    if (tipoGasto !== TipoGasto.COMBUSTIBLE) {
+        return { ...datos, galones: null, precioPorGalon: null, estacionServicio: null, kilometrajeAlCargar: null };
+    }
+    if (datos.galones !== undefined && datos.galones !== null && datos.galones <= 0) {
+        throw new ValidationError('Los galones deben ser mayores a 0');
+    }
+    if (datos.galones && !datos.precioPorGalon && monto) {
+        return { ...datos, precioPorGalon: r2(monto / datos.galones) };
+    }
+    return datos;
+};
 
 export const gastosService = {
     /**
      * Listar gastos de un viaje
      */
     async listarPorViaje(viajeId: number) {
-        // Verificar que el viaje existe
         const viaje = await viajesRepository.findById(viajeId);
-        if (!viaje) {
-            throw new Error('Viaje no encontrado');
-        }
-
+        if (!viaje) throw new NotFoundError('Viaje no encontrado');
         return gastosRepository.findByViajeId(viajeId);
     },
 
     /**
-     * Crear un gasto de viaje (con soporte para archivo)
+     * Crear un gasto de viaje (con soporte para archivo de comprobante)
      */
-    async crear(datos: DatosCrearGastoConArchivo, usuarioId: number) {
-        // Verificar que el viaje existe
+    async crear(datos: DatosCrearGastoConArchivo, usuarioId: number, ip?: string) {
         const viaje = await viajesRepository.findById(datos.viajeId);
-        if (!viaje) {
-            throw new Error('Viaje no encontrado');
-        }
+        if (!viaje) throw new NotFoundError('Viaje no encontrado');
 
-        // Validar monto
+        if (viaje.estado === EstadoViaje.CANCELADO) {
+            throw new ConflictError('No se pueden registrar gastos en un viaje cancelado');
+        }
         if (datos.monto <= 0) {
-            throw new Error('El monto debe ser mayor a 0');
+            throw new ValidationError('El monto debe ser mayor a 0');
         }
 
-        let comprobanteId: number | undefined;
+        const { archivo, ...resto } = datos;
+        const datosGasto = normalizarCombustible(resto, datos.tipoGasto, datos.monto);
 
-        // Si hay archivo, subirlo a Cloudinary
-        if (datos.archivo) {
-            const resultadoUpload = await uploadToCloudinary(
-                datos.archivo.buffer,
-                'comprobantes/gastos',
-                datos.archivo.originalname
-            );
+        return enTransaccion(async (tx) => {
+            let comprobanteId: number | undefined;
 
-            // Crear registro de comprobante
-            const comprobante = await gastosRepository.createComprobante({
-                tipo: TipoComprobante.GASTO_VIAJE,
-                url: resultadoUpload.url,
-                publicId: resultadoUpload.publicId,
-                nombreArchivoOriginal: datos.archivo.originalname,
-            });
-
-            comprobanteId = comprobante.id;
-        }
-
-        // Crear el gasto
-        const datosGasto: DatosCrearGasto = {
-            viajeId: datos.viajeId,
-            tipoGasto: datos.tipoGasto,
-            monto: datos.monto,
-            fecha: datos.fecha,
-            metodoPago: datos.metodoPago,
-            descripcion: datos.descripcion,
-        };
-
-        const gasto = await gastosRepository.create(datosGasto, comprobanteId);
-
-        // Actualizar referenciaId del comprobante si existe
-        if (comprobanteId) {
-            await gastosRepository.createComprobante;
-        }
-
-        // Registrar auditoría
-        await auditoriaRepository.create(usuarioId, {
-            accion: AccionAuditoria.CREAR,
-            entidad: 'GastoViaje',
-            entidadId: gasto.id,
-            datosNuevos: gasto,
-        });
-
-        return gasto;
-    },
-
-    /**
-     * Actualizar un gasto
-     */
-    async actualizar(id: number, datos: Partial<DatosCrearGasto>, usuarioId: number) {
-        const gastoAnterior = await gastosRepository.findById(id);
-
-        if (!gastoAnterior) {
-            throw new Error('Gasto no encontrado');
-        }
-
-        if (datos.monto && datos.monto <= 0) {
-            throw new Error('El monto debe ser mayor a 0');
-        }
-
-        const gastoActualizado = await gastosRepository.update(id, datos);
-
-        // Registrar auditoría
-        await auditoriaRepository.create(usuarioId, {
-            accion: AccionAuditoria.EDITAR,
-            entidad: 'GastoViaje',
-            entidadId: id,
-            datosAnteriores: gastoAnterior,
-            datosNuevos: gastoActualizado,
-        });
-
-        return gastoActualizado;
-    },
-
-    /**
-     * Eliminar un gasto
-     */
-    async eliminar(id: number, usuarioId: number) {
-        const gasto = await gastosRepository.findById(id);
-
-        if (!gasto) {
-            throw new Error('Gasto no encontrado');
-        }
-
-        // Si tiene comprobante, eliminar de Cloudinary (opcional)
-        if (gasto.comprobante) {
-            try {
-                await deleteFromCloudinary(gasto.comprobante.publicId);
-            } catch (error) {
-                console.error('Error al eliminar comprobante de Cloudinary:', error);
+            if (archivo) {
+                const subido = storageService.procesarArchivoSubido(archivo, 'gastos');
+                const comprobante = await gastosRepository.createComprobante({
+                    tipo: TipoComprobante.GASTO_VIAJE,
+                    url: subido.url,
+                    publicId: subido.publicId,
+                    nombreArchivoOriginal: archivo.originalname,
+                }, tx);
+                comprobanteId = comprobante.id;
             }
+
+            const gasto = await gastosRepository.create(datosGasto, comprobanteId, tx);
+
+            // Referencia inversa: el comprobante apunta al gasto que respalda
+            if (comprobanteId) {
+                await gastosRepository.setReferenciaComprobante(comprobanteId, gasto.id, tx);
+            }
+
+            await auditoriaRepository.create(usuarioId, {
+                accion: AccionAuditoria.CREAR,
+                entidad: 'GastoViaje',
+                entidadId: gasto.id,
+                datosNuevos: gasto,
+                ipAddress: ip,
+            }, tx);
+
+            return gasto;
+        });
+    },
+
+    /**
+     * Actualizar un gasto (no se puede mover a otro viaje)
+     */
+    async actualizar(id: number, datos: DatosActualizarGasto, usuarioId: number, ip?: string) {
+        const gastoAnterior = await gastosRepository.findById(id);
+        if (!gastoAnterior) throw new NotFoundError('Gasto no encontrado');
+
+        if (gastoAnterior.viaje.estado === EstadoViaje.CANCELADO) {
+            throw new ConflictError('No se pueden editar gastos de un viaje cancelado');
+        }
+        if (datos.monto !== undefined && datos.monto <= 0) {
+            throw new ValidationError('El monto debe ser mayor a 0');
         }
 
-        await gastosRepository.delete(id);
+        const tipo = datos.tipoGasto ?? gastoAnterior.tipoGasto;
+        const monto = datos.monto ?? Number(gastoAnterior.monto);
+        const cambios = normalizarCombustible(datos, tipo, monto);
 
-        // Registrar auditoría
-        await auditoriaRepository.create(usuarioId, {
-            accion: AccionAuditoria.ELIMINAR,
-            entidad: 'GastoViaje',
-            entidadId: id,
-            datosAnteriores: gasto,
+        return enTransaccion(async (tx) => {
+            const gastoActualizado = await gastosRepository.update(id, cambios, tx);
+            await auditoriaRepository.create(usuarioId, {
+                accion: AccionAuditoria.EDITAR,
+                entidad: 'GastoViaje',
+                entidadId: id,
+                datosAnteriores: gastoAnterior,
+                datosNuevos: gastoActualizado,
+                ipAddress: ip,
+            }, tx);
+            return gastoActualizado;
         });
+    },
+
+    /**
+     * Eliminar un gasto y su comprobante
+     */
+    async eliminar(id: number, usuarioId: number, ip?: string) {
+        const gasto = await gastosRepository.findById(id);
+        if (!gasto) throw new NotFoundError('Gasto no encontrado');
+
+        await enTransaccion(async (tx) => {
+            await gastosRepository.delete(id, tx);
+            if (gasto.comprobanteId) {
+                await gastosRepository.deleteComprobante(gasto.comprobanteId, tx);
+            }
+            await auditoriaRepository.create(usuarioId, {
+                accion: AccionAuditoria.ELIMINAR,
+                entidad: 'GastoViaje',
+                entidadId: id,
+                datosAnteriores: gasto,
+                ipAddress: ip,
+            }, tx);
+        });
+
+        // El archivo se borra solo después de confirmar la transacción
+        if (gasto.comprobante) {
+            await storageService.eliminarArchivo(gasto.comprobante.publicId);
+        }
 
         return { mensaje: 'Gasto eliminado correctamente' };
     },

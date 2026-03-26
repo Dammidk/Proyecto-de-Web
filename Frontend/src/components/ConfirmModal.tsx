@@ -1,4 +1,4 @@
-import { X, AlertTriangle, LogOut, Trash2 } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface ConfirmModalProps {
     isOpen: boolean;
@@ -28,66 +28,35 @@ const ConfirmModal = ({
         onClose();
     };
 
-    const iconMap = {
-        danger: Trash2,
-        warning: AlertTriangle,
-        info: LogOut
-    };
-
-    const colorMap = {
-        danger: 'text-rose-600 bg-rose-50 border-rose-200',
-        warning: 'text-amber-600 bg-amber-50 border-amber-200',
-        info: 'text-blue-600 bg-blue-50 border-blue-200'
-    };
-
     const buttonMap = {
-        danger: 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-600',
-        warning: 'bg-amber-600 hover:bg-amber-700 focus:ring-amber-600',
-        info: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-600'
+        danger: 'btn-danger',
+        warning: 'btn-primary',
+        info: 'btn-primary'
     };
-
-    const Icon = iconMap[type];
 
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div
                 className="modal-content max-w-md"
+                role="dialog"
+                aria-modal="true"
+                aria-label={title}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="modal-header border-b-0 pb-2">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full border ${colorMap[type]}`}>
-                            <Icon className="h-6 w-6" />
-                        </div>
-                        <h3 className="modal-title">{title}</h3>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="text-slate-400 hover:text-slate-600 transition-colors"
-                    >
-                        <X className="h-5 w-5" />
+                <div className="modal-header">
+                    <h3 className="modal-title">{title}</h3>
+                    <button onClick={onClose} className="action-btn" aria-label="Cerrar">
+                        <X className="h-4 w-4" />
                     </button>
                 </div>
 
-                <div className="px-6 py-4">
-                    <p className="text-slate-600 text-sm leading-relaxed">
-                        {message}
-                    </p>
+                <div className="modal-body">
+                    <p className="text-slate-600 text-sm leading-relaxed">{message}</p>
                 </div>
 
-                <div className="modal-footer bg-slate-50">
-                    <button
-                        onClick={onClose}
-                        className="btn btn-secondary"
-                    >
-                        {cancelText}
-                    </button>
-                    <button
-                        onClick={handleConfirm}
-                        className={`btn text-white shadow-lg active:scale-95 ${buttonMap[type]}`}
-                    >
-                        {confirmText}
-                    </button>
+                <div className="modal-footer">
+                    <button onClick={onClose} className="btn btn-secondary">{cancelText}</button>
+                    <button onClick={handleConfirm} className={`btn ${buttonMap[type]}`}>{confirmText}</button>
                 </div>
             </div>
         </div>

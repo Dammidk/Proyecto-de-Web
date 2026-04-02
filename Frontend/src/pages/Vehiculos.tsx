@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from '../services/api';
+import axios, { mensajeError } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
@@ -15,7 +15,8 @@ import {
     CheckCircle,
     AlertTriangle,
     Calendar,
-    Truck
+    Truck,
+    Wrench
 } from 'lucide-react';
 
 const Vehiculos = () => {
@@ -37,7 +38,8 @@ const Vehiculos = () => {
         tipo: '', capacidad: '', estado: 'ACTIVO', kilometrajeActual: 0,
         observaciones: '',
         fechaUltimoMantenimiento: '', fechaProximoMantenimiento: '',
-        fechaVencimientoSoat: '', fechaVencimientoSeguro: '', fechaVencimientoMatricula: ''
+        fechaVencimientoSoat: '', fechaVencimientoSeguro: '', fechaVencimientoMatricula: '',
+        fechaVencimientoRevisionTecnica: '', rendimientoEsperadoKmGal: '' as string | number
     };
     const [formData, setFormData] = useState(formInicial);
 
@@ -74,8 +76,7 @@ const Vehiculos = () => {
             setModalOpen(false);
             cargarVehiculos();
         } catch (error: any) {
-            const msg = error.response?.data?.error || 'Error al guardar';
-            toast.error(msg);
+            toast.error(mensajeError(error, 'Error al guardar'));
         }
     };
 
@@ -91,7 +92,7 @@ const Vehiculos = () => {
             toast.success('Vehículo eliminado');
             cargarVehiculos();
         } catch (error) {
-            toast.error('Error al eliminar');
+            toast.error(mensajeError(error, 'Error al eliminar'));
         } finally {
             setVehiculoToDelete(null);
         }
@@ -107,7 +108,9 @@ const Vehiculos = () => {
                 fechaProximoMantenimiento: vehiculo.fechaProximoMantenimiento?.split('T')[0] || '',
                 fechaVencimientoSoat: vehiculo.fechaVencimientoSoat?.split('T')[0] || '',
                 fechaVencimientoSeguro: vehiculo.fechaVencimientoSeguro?.split('T')[0] || '',
-                fechaVencimientoMatricula: vehiculo.fechaVencimientoMatricula?.split('T')[0] || ''
+                fechaVencimientoMatricula: vehiculo.fechaVencimientoMatricula?.split('T')[0] || '',
+                fechaVencimientoRevisionTecnica: vehiculo.fechaVencimientoRevisionTecnica?.split('T')[0] || '',
+                rendimientoEsperadoKmGal: vehiculo.rendimientoEsperadoKmGal ?? ''
             });
         } else {
             setModoEdicion(false);
@@ -218,16 +221,19 @@ const Vehiculos = () => {
                                         </td>
                                         <td className="text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => navigate(`/mantenimientos?vehiculoId=${v.id}`)} className="btn-ghost p-2 rounded-lg" title="Ver Mantenimientos">
+                                                    <Wrench className="text-slate-400 group-hover:text-amber-600 h-4 w-4" />
+                                                </button>
                                                 <button onClick={() => abrirDetalle(v)} className="btn-ghost p-2 rounded-lg" title="Ver detalles">
-                                                    <Eye className="text-slate-400 group-hover:text-indigo-600" />
+                                                    <Eye className="text-slate-400 group-hover:text-indigo-600 h-4 w-4" />
                                                 </button>
                                                 {usuario?.rol === 'ADMIN' && (
                                                     <>
                                                         <button onClick={() => abrirModal(v)} className="btn-ghost p-2 rounded-lg" title="Editar">
-                                                            <Edit2 className="text-slate-400 group-hover:text-amber-600" />
+                                                            <Edit2 className="text-slate-400 group-hover:text-amber-600 h-4 w-4" />
                                                         </button>
                                                         <button onClick={() => confirmarEliminacion(v.id)} className="btn-ghost p-2 rounded-lg" title="Eliminar">
-                                                            <Trash2 className="text-slate-400 group-hover:text-rose-600" />
+                                                            <Trash2 className="text-slate-400 group-hover:text-rose-600 h-4 w-4" />
                                                         </button>
                                                     </>
                                                 )}
@@ -310,6 +316,14 @@ const Vehiculos = () => {
                                     <input type="date" className="form-input text-sm" value={formData.fechaVencimientoMatricula} onChange={e => setFormData({ ...formData, fechaVencimientoMatricula: e.target.value })} />
                                 </div>
                                 <div>
+                                    <label className="form-label">Venc. Revisión Técnica (RTV)</label>
+                                    <input type="date" className="form-input text-sm" value={formData.fechaVencimientoRevisionTecnica} onChange={e => setFormData({ ...formData, fechaVencimientoRevisionTecnica: e.target.value })} />
+                                </div>
+                                <div>
+                                    <label className="form-label">Rendimiento esperado (km/gal)</label>
+                                    <input type="number" step="0.1" min="0" className="form-input text-sm" placeholder="Ej. 8 (dato del fabricante)" value={formData.rendimientoEsperadoKmGal} onChange={e => setFormData({ ...formData, rendimientoEsperadoKmGal: e.target.value })} />
+                                </div>
+                                <div>
                                     <label className="form-label">Próximo Mantenimiento</label>
                                     <input type="date" className="form-input text-sm" value={formData.fechaProximoMantenimiento} onChange={e => setFormData({ ...formData, fechaProximoMantenimiento: e.target.value })} />
                                 </div>
@@ -380,10 +394,16 @@ const Vehiculos = () => {
                                                 {vehiculoSeleccionado.fechaVencimientoSeguro ? new Date(vehiculoSeleccionado.fechaVencimientoSeguro).toLocaleDateString() : 'N/A'}
                                             </span>
                                         </li>
-                                        <li className="flex justify-between pt-1">
+                                        <li className="flex justify-between border-b border-slate-50 pb-1">
                                             <span>Matrícula:</span>
                                             <span className={!vehiculoSeleccionado.fechaVencimientoMatricula ? 'text-slate-400' : ''}>
                                                 {vehiculoSeleccionado.fechaVencimientoMatricula ? new Date(vehiculoSeleccionado.fechaVencimientoMatricula).toLocaleDateString() : 'N/A'}
+                                            </span>
+                                        </li>
+                                        <li className="flex justify-between pt-1">
+                                            <span>Revisión técnica:</span>
+                                            <span className={!vehiculoSeleccionado.fechaVencimientoRevisionTecnica ? 'text-slate-400' : ''}>
+                                                {vehiculoSeleccionado.fechaVencimientoRevisionTecnica ? new Date(vehiculoSeleccionado.fechaVencimientoRevisionTecnica).toLocaleDateString() : 'N/A'}
                                             </span>
                                         </li>
                                     </ul>
@@ -391,19 +411,29 @@ const Vehiculos = () => {
                             </div>
 
                             {vehiculoSeleccionado.observaciones && (
-                                <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                                <div className="bg-amber-50 p-4 rounded-md border border-amber-100">
                                     <h5 className="text-xs font-bold text-amber-700 uppercase mb-1">Observaciones</h5>
                                     <p className="text-sm text-amber-800">{vehiculoSeleccionado.observaciones}</p>
                                 </div>
                             )}
 
-                            <div className="pt-4 border-t border-slate-100 flex justify-end">
+                            <div className="pt-4 border-t border-slate-100 flex justify-end gap-2">
+                                <button
+                                    onClick={() => {
+                                        setDetalleOpen(false);
+                                        navigate(`/mantenimientos?vehiculoId=${vehiculoSeleccionado.id}`);
+                                    }}
+                                    className="btn btn-secondary flex items-center gap-2 text-xs"
+                                >
+                                    <Wrench className="h-4 w-4 text-indigo-600" />
+                                    Mantenimientos
+                                </button>
                                 <button
                                     onClick={() => {
                                         setDetalleOpen(false);
                                         navigate(`/viajes?vehiculoId=${vehiculoSeleccionado.id}`);
                                     }}
-                                    className="btn btn-outline flex items-center gap-2"
+                                    className="btn btn-outline flex items-center gap-2 text-xs"
                                 >
                                     Ver Historial de Viajes
                                 </button>

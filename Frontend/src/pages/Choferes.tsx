@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from '../services/api';
+import axios, { mensajeError } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
@@ -14,7 +14,8 @@ import {
     User,
     Phone,
     CreditCard,
-    Truck
+    Truck,
+    Banknote
 } from 'lucide-react';
 
 const Choferes = () => {
@@ -33,7 +34,8 @@ const Choferes = () => {
         nombres: '', apellidos: '', documentoId: '',
         telefono: '', correo: '', estado: 'ACTIVO',
         modalidadPago: 'POR_VIAJE', metodoPago: 'EFECTIVO',
-        banco: '', numeroCuenta: '', sueldoMensual: 0
+        banco: '', numeroCuenta: '', sueldoMensual: 0,
+        licenciaTipo: '', fechaVencimientoLicencia: ''
     };
     const [formData, setFormData] = useState(formInicial);
 
@@ -63,7 +65,7 @@ const Choferes = () => {
             }
             setModalOpen(false);
             cargarChoferes();
-        } catch (error: any) { toast.error(error.response?.data?.error || 'Error al guardar'); }
+        } catch (error: any) { toast.error(mensajeError(error, 'Error al guardar')); }
     };
 
     const confirmarEliminacion = (id: number) => {
@@ -77,7 +79,7 @@ const Choferes = () => {
             await axios.delete(`/choferes/${choferToDelete}`);
             toast.success('Chofer eliminado');
             cargarChoferes();
-        } catch (error) { toast.error('Error al eliminar'); }
+        } catch (error) { toast.error(mensajeError(error, 'Error al eliminar')); }
         finally { setChoferToDelete(null); }
     };
 
@@ -85,7 +87,16 @@ const Choferes = () => {
         if (chofer) {
             setModoEdicion(true);
             setChoferSeleccionado(chofer);
-            setFormData(chofer);
+            setFormData({
+                ...chofer,
+                telefono: chofer.telefono || '',
+                correo: chofer.correo || '',
+                banco: chofer.banco || '',
+                numeroCuenta: chofer.numeroCuenta || '',
+                sueldoMensual: Number(chofer.sueldoMensual || 0),
+                licenciaTipo: chofer.licenciaTipo || '',
+                fechaVencimientoLicencia: chofer.fechaVencimientoLicencia?.split('T')[0] || ''
+            });
         } else {
             setModoEdicion(false);
             setChoferSeleccionado(null);
@@ -186,6 +197,9 @@ const Choferes = () => {
                                         </td>
                                         <td className="text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => navigate(`/pagos-choferes?choferId=${c.id}`)} className="btn-ghost p-2 rounded-lg" title="Ver Pagos y Balance">
+                                                    <Banknote className="h-4 w-4 text-slate-400 hover:text-emerald-600" />
+                                                </button>
                                                 <button onClick={() => navigate(`/viajes?choferId=${c.id}`)} className="btn-ghost p-2 rounded-lg" title="Ver Viajes">
                                                     <Truck className="h-4 w-4 text-slate-400 hover:text-indigo-600" />
                                                 </button>
@@ -228,6 +242,22 @@ const Choferes = () => {
                                         </select>
                                     </div>
 
+                                    <div className="col-span-2 border-t border-slate-100 pt-2"><h4 className="text-sm font-semibold text-slate-700">Licencia de conducir</h4></div>
+                                    <div>
+                                        <label className="form-label">Tipo de licencia</label>
+                                        <select className="form-select" value={formData.licenciaTipo} onChange={e => setFormData({ ...formData, licenciaTipo: e.target.value })}>
+                                            <option value="">Sin registrar</option>
+                                            <option value="C">Tipo C (livianos comerciales)</option>
+                                            <option value="D">Tipo D (buses)</option>
+                                            <option value="E">Tipo E (pesados y carga peligrosa)</option>
+                                            <option value="G">Tipo G (maquinaria)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="form-label">Vencimiento de licencia</label>
+                                        <input type="date" className="form-input" value={formData.fechaVencimientoLicencia} onChange={e => setFormData({ ...formData, fechaVencimientoLicencia: e.target.value })} />
+                                    </div>
+
                                     <div className="col-span-2 border-t border-slate-100 pt-2"><h4 className="text-sm font-semibold text-slate-700">Información de Pago</h4></div>
 
                                     <div>
@@ -242,6 +272,7 @@ const Choferes = () => {
                                         <select className="form-select" value={formData.metodoPago} onChange={e => setFormData({ ...formData, metodoPago: e.target.value })}>
                                             <option value="EFECTIVO">Efectivo</option>
                                             <option value="TRANSFERENCIA">Transferencia</option>
+                                            <option value="TARJETA">Tarjeta</option>
                                         </select>
                                     </div>
 

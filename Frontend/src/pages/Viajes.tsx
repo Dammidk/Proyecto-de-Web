@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { viajeService, gastoService, vehiculoService, choferService, clienteService, materialService } from '../services/api';
 import toast from 'react-hot-toast';
 import LocationInput, { calculateRoute } from '../components/LocationInput';
+import { ETIQUETAS_TIPO_GASTO, isoLocal, localAIso, numero } from '../utils/formato';
 import {
     Plus,
     Search,
@@ -25,7 +26,10 @@ import {
     Play,
     Truck,
     Eye,
-    ChevronLeft
+    ChevronLeft,
+    Receipt,
+    Fuel,
+    AlertTriangle
 } from 'lucide-react';
 
 // Mapeo de estados para badges
@@ -78,7 +82,38 @@ interface FormGasto {
     fecha: string;
     metodoPago: string;
     descripcion: string;
+    // Control de combustible
+    galones: string;
+    precioPorGalon: string;
+    estacionServicio: string;
+    kilometrajeAlCargar: string;
 }
+
+interface ResumenEconomico {
+    ingreso: number;
+    gastos: number;
+    pagosChofer?: number;
+    costoTotal?: number;
+    ganancia: number;
+    margenPorcentaje?: number;
+    kilometros?: number | null;
+    costoPorKm?: number | null;
+    galones?: number;
+    rendimientoKmGal?: number | null;
+    diagnosticoCombustible?: 'NORMAL' | 'BAJO' | 'SIN_DATOS' | 'SIN_REFERENCIA';
+}
+
+const gastoVacio = (): FormGasto => ({
+    tipoGasto: 'COMBUSTIBLE',
+    monto: '',
+    fecha: new Date().toISOString().split('T')[0],
+    metodoPago: 'EFECTIVO',
+    descripcion: '',
+    galones: '',
+    precioPorGalon: '',
+    estacionServicio: '',
+    kilometrajeAlCargar: '',
+});
 
 export default function Viajes() {
     const { usuario } = useAuth();
@@ -91,7 +126,7 @@ export default function Viajes() {
     const [vista, setVista] = useState<'lista' | 'formulario' | 'detalle'>('lista');
     const [viajeSeleccionado, setViajeSeleccionado] = useState<Viaje | null>(null);
     const [editando, setEditando] = useState(false);
-    const [resumenEconomico, setResumenEconomico] = useState<{ ingreso: number; gastos: number; ganancia: number } | null>(null);
+    const [resumenEconomico, setResumenEconomico] = useState<ResumenEconomico | null>(null);
 
     // Datos para selects
     const [vehiculos, setVehiculos] = useState<any[]>([]);
@@ -146,7 +181,7 @@ export default function Viajes() {
                             const salida = new Date(prev.fechaSalida);
                             if (!isNaN(salida.getTime())) {
                                 const llegada = new Date(salida.getTime() + result.duration * 60 * 1000);
-                                updates.fechaLlegadaEstimada = llegada.toISOString().slice(0, 16);
+                                updates.fechaLlegadaEstimada = isoLocal(llegada);
                             }
                         }
 
@@ -160,13 +195,7 @@ export default function Viajes() {
 
     // Modal de gasto
     const [mostrarModalGasto, setMostrarModalGasto] = useState(false);
-    const [formGasto, setFormGasto] = useState<FormGasto>({
-        tipoGasto: 'COMBUSTIBLE',
-        monto: '',
-        fecha: new Date().toISOString().split('T')[0],
-        metodoPago: 'EFECTIVO',
-        descripcion: '',
-    });
+    const [formGasto, setFormGasto] = useState<FormGasto>(gastoVacio());
     const [archivoComprobante, setArchivoComprobante] = useState<File | null>(null);
 
     // Modal para completar viaje
@@ -208,12 +237,14 @@ export default function Viajes() {
     const cargarDatosSelects = async () => {
         try {
             const [vRes, cRes, clRes, mRes] = await Promise.all([
-                vehiculoService.listar({ estado: 'ACTIVO' }),
+                vehiculoService.listar(),
                 choferService.listar({ estado: 'ACTIVO' }),
                 clienteService.listar({ estado: 'ACTIVO' }),
                 materialService.listar(),
             ]);
-            setVehiculos(vRes.vehiculos || []);
+            // Se pueden planificar viajes con vehículos activos o que hoy están en ruta;
+            // los que están en taller o inactivos no se ofrecen (el backend también lo valida)
+            setVehiculos((vRes.vehiculos || []).filter((v: any) => v.estado === 'ACTIVO' || v.estado === 'EN_RUTA'));
             setChoferes(cRes.choferes || []);
             setClientes(clRes.clientes || []);
             setMateriales(mRes.materiales || []);
@@ -269,8 +300,8 @@ export default function Viajes() {
                 materialId: parseInt(formViaje.materialId),
                 origen: formViaje.origen,
                 destino: formViaje.destino,
-                fechaSalida: formViaje.fechaSalida,
-                fechaLlegadaEstimada: formViaje.fechaLlegadaEstimada || undefined,
+                fechaSalida: localAIso(formViaje.fechaSalida),
+                fechaLlegadaEstimada: formViaje.fechaLlegadaEstimada ? localAIso(formViaje.fechaLlegadaEstimada) : undefined,
                 kilometrosEstimados: formViaje.kilometrosEstimados ? parseInt(formViaje.kilometrosEstimados) : undefined,
                 tarifa: parseFloat(formViaje.tarifa),
                 observaciones: formViaje.observaciones || undefined,
@@ -297,6 +328,10 @@ export default function Viajes() {
         if (!viajeSeleccionado) return;
 
         if (nuevoEstado === 'COMPLETADO') {
+            setDatosComplecion({
+                kilometrosReales: viajeSeleccionado.kilometrosEstimados ? String(viajeSeleccionado.kilometrosEstimados) : '',
+                fechaLlegadaReal: isoLocal(new Date()),
+            });
             setMostrarModalCompletar(true);
             return;
         }
@@ -315,7 +350,7 @@ export default function Viajes() {
 
         try {
             await viajeService.cambiarEstado(viajeSeleccionado.id, 'COMPLETADO', {
-                fechaLlegadaReal: datosComplecion.fechaLlegadaReal,
+                fechaLlegadaReal: localAIso(datosComplecion.fechaLlegadaReal),
                 kilometrosReales: datosComplecion.kilometrosReales ? parseInt(datosComplecion.kilometrosReales) : undefined,
             });
             toast.success('Viaje completado exitosamente');
@@ -337,18 +372,18 @@ export default function Viajes() {
             formData.append('fecha', formGasto.fecha);
             formData.append('metodoPago', formGasto.metodoPago);
             if (formGasto.descripcion) formData.append('descripcion', formGasto.descripcion);
+            if (formGasto.tipoGasto === 'COMBUSTIBLE') {
+                if (formGasto.galones) formData.append('galones', formGasto.galones);
+                if (formGasto.precioPorGalon) formData.append('precioPorGalon', formGasto.precioPorGalon);
+                if (formGasto.estacionServicio) formData.append('estacionServicio', formGasto.estacionServicio);
+                if (formGasto.kilometrajeAlCargar) formData.append('kilometrajeAlCargar', formGasto.kilometrajeAlCargar);
+            }
             if (archivoComprobante) formData.append('comprobante', archivoComprobante);
 
             await gastoService.crear(viajeSeleccionado.id, formData);
             toast.success('Gasto registrado exitosamente');
             setMostrarModalGasto(false);
-            setFormGasto({
-                tipoGasto: 'COMBUSTIBLE',
-                monto: '',
-                fecha: new Date().toISOString().split('T')[0],
-                metodoPago: 'EFECTIVO',
-                descripcion: '',
-            });
+            setFormGasto(gastoVacio());
             setArchivoComprobante(null);
             cargarDetalleViaje(viajeSeleccionado.id);
         } catch (error: any) {
@@ -692,7 +727,7 @@ export default function Viajes() {
 
                                             {/* Info de ruta calculada */}
                                             {(calculandoRuta || rutaCalculada) && (
-                                                <div className="md:col-span-2 bg-indigo-50 border border-indigo-100 rounded-xl p-4">
+                                                <div className="md:col-span-2 bg-indigo-50 border border-indigo-100 rounded-md p-4">
                                                     {calculandoRuta ? (
                                                         <div className="flex items-center gap-2 text-indigo-600">
                                                             <div className="spinner h-4 w-4 border-2" />
@@ -848,8 +883,12 @@ export default function Viajes() {
                             </p>
                         </div>
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Link to={`/viajes/${viajeSeleccionado.id}/liquidacion`} className="btn btn-secondary">
+                            <Receipt size={16} /> Liquidación
+                        </Link>
                     {esAdmin && (
-                        <div className="flex gap-2">
+                        <>
                             {puedeIniciar && (
                                 <button onClick={() => handleCambiarEstado('EN_CURSO')} className="btn bg-indigo-600 hover:bg-indigo-700 text-white">
                                     <Play size={16} /> Iniciar
@@ -865,15 +904,16 @@ export default function Viajes() {
                                     <Ban size={16} /> Cancelar
                                 </button>
                             )}
-                        </div>
+                        </>
                     )}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Columna Izquierda: Información General */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Tarjeta Info Principal */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <div className="bg-white p-6 rounded-md shadow-sm border border-slate-100">
                             <h3 className="text-sm font-bold text-slate-800 uppercase mb-4 flex items-center gap-2">
                                 <FileText size={16} className="text-indigo-500" /> Detalles del Servicio
                             </h3>
@@ -927,12 +967,12 @@ export default function Viajes() {
                         </div>
 
                         {/* Tarjeta Gastos */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                        <div className="bg-white p-6 rounded-md shadow-sm border border-slate-100">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="text-sm font-bold text-slate-800 uppercase flex items-center gap-2">
                                     <DollarSign size={16} className="text-amber-500" /> Gastos Operativos
                                 </h3>
-                                {esAdmin && (estadoActual === 'PLANIFICADO' || estadoActual === 'EN_CURSO') && (
+                                {esAdmin && estadoActual !== 'CANCELADO' && (
                                     <button
                                         onClick={() => setMostrarModalGasto(true)}
                                         className="btn-ghost text-xs bg-slate-50 hover:bg-slate-100 text-indigo-600 font-medium px-3 py-1.5 rounded-lg border border-slate-200"
@@ -957,8 +997,11 @@ export default function Viajes() {
                                             {viajeSeleccionado.gastos.map((gasto: any) => (
                                                 <tr key={gasto.id}>
                                                     <td className="py-3">
-                                                        <div className="font-medium text-slate-700">{gasto.tipoGasto}</div>
-                                                        <div className="text-xs text-slate-400">{gasto.descripcion || gasto.metodoPago}</div>
+                                                        <div className="font-medium text-slate-700">{ETIQUETAS_TIPO_GASTO[gasto.tipoGasto] ?? gasto.tipoGasto}</div>
+                                                        <div className="text-xs text-slate-400">
+                                                            {gasto.galones ? `${numero(gasto.galones, 2)} gal${gasto.estacionServicio ? ` · ${gasto.estacionServicio}` : ''} · ` : ''}
+                                                            {gasto.descripcion || gasto.metodoPago}
+                                                        </div>
                                                     </td>
                                                     <td className="py-3 text-slate-600">{new Date(gasto.fecha).toLocaleDateString()}</td>
                                                     <td className="py-3 font-medium text-rose-600">{formatearMoneda(gasto.monto)}</td>
@@ -996,20 +1039,26 @@ export default function Viajes() {
 
                     {/* Columna Derecha: Resumen Económico */}
                     <div className="space-y-6">
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 sticky top-6">
+                        <div className="bg-white p-6 rounded-md shadow-sm border border-slate-100 sticky top-6">
                             <h3 className="text-sm font-bold text-slate-800 uppercase mb-4 text-center">Resumen Económico</h3>
 
                             <div className="space-y-4">
-                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md border border-slate-100">
                                     <span className="text-slate-600 text-sm font-medium">Ingresos Estimados</span>
                                     <span className="text-emerald-600 font-bold">{formatearMoneda(viajeSeleccionado.tarifa)}</span>
                                 </div>
-                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl border border-slate-100">
-                                    <span className="text-slate-600 text-sm font-medium">Total Gastos</span>
+                                <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md border border-slate-100">
+                                    <span className="text-slate-600 text-sm font-medium">Gastos de ruta</span>
                                     <span className="text-rose-600 font-bold">
                                         - {formatearMoneda(resumenEconomico?.gastos || 0)}
                                     </span>
                                 </div>
+                                {(resumenEconomico?.pagosChofer || 0) > 0 && (
+                                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md border border-slate-100">
+                                        <span className="text-slate-600 text-sm font-medium">Pago al chofer</span>
+                                        <span className="text-rose-600 font-bold">- {formatearMoneda(resumenEconomico?.pagosChofer || 0)}</span>
+                                    </div>
+                                )}
                                 <div className="border-t border-slate-100 pt-4">
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="text-slate-800 font-bold">Margen Operativo</span>
@@ -1033,11 +1082,31 @@ export default function Viajes() {
                                         Margen: {((resumenEconomico?.ganancia || 0) / viajeSeleccionado.tarifa * 100).toFixed(1)}%
                                     </p>
                                 </div>
+                                {resumenEconomico && (
+                                    <div className="grid grid-cols-2 gap-3 border-t border-slate-100 pt-4 text-center">
+                                        <div className="p-2 rounded-md bg-slate-50">
+                                            <p className="text-[11px] uppercase text-slate-400 font-semibold">Costo por km</p>
+                                            <p className="font-bold text-slate-800">{resumenEconomico.costoPorKm != null ? formatearMoneda(resumenEconomico.costoPorKm) : '—'}</p>
+                                            <p className="text-[11px] text-slate-400">{resumenEconomico.kilometros ? `${numero(resumenEconomico.kilometros)} km` : 'sin km'}</p>
+                                        </div>
+                                        <div className="p-2 rounded-md bg-slate-50">
+                                            <p className="text-[11px] uppercase text-slate-400 font-semibold">Rendimiento</p>
+                                            <p className="font-bold text-slate-800">{resumenEconomico.rendimientoKmGal != null ? `${numero(resumenEconomico.rendimientoKmGal, 1)} km/gal` : '—'}</p>
+                                            <p className="text-[11px] text-slate-400">{resumenEconomico.galones ? `${numero(resumenEconomico.galones, 1)} gal` : 'sin galones'}</p>
+                                        </div>
+                                        {resumenEconomico.diagnosticoCombustible === 'BAJO' && (
+                                            <p className="col-span-2 flex items-start gap-1.5 text-left text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-lg p-2">
+                                                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                                                Consumo por encima de lo esperado para este vehículo: revise fugas, posible desvío de combustible o fallas mecánicas.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         {viajeSeleccionado.observaciones && (
-                            <div className="bg-amber-50 p-4 rounded-xl border border-amber-100">
+                            <div className="bg-amber-50 p-4 rounded-md border border-amber-100">
                                 <h3 className="text-xs font-bold text-amber-700 uppercase mb-2">Observaciones</h3>
                                 <p className="text-sm text-amber-800">{viajeSeleccionado.observaciones}</p>
                             </div>
@@ -1063,7 +1132,7 @@ export default function Viajes() {
                                             onChange={(e) => setFormGasto({ ...formGasto, tipoGasto: e.target.value })}
                                             required
                                         >
-                                            {TIPOS_GASTO.map(type => <option key={type} value={type}>{type}</option>)}
+                                            {TIPOS_GASTO.map(type => <option key={type} value={type}>{ETIQUETAS_TIPO_GASTO[type] ?? type}</option>)}
                                         </select>
                                     </div>
                                     <div>
@@ -1106,12 +1175,40 @@ export default function Viajes() {
                                             placeholder="Detalle opcional..."
                                         />
                                     </div>
+                                    {formGasto.tipoGasto === 'COMBUSTIBLE' && (
+                                        <div className="md:col-span-2 grid grid-cols-2 gap-4 p-4 rounded-md border border-indigo-100 bg-indigo-50/40">
+                                            <p className="col-span-2 text-xs text-indigo-800 flex items-center gap-1.5">
+                                                <Fuel size={14} /> Registrar los galones permite medir el rendimiento (km/gal) y detectar consumos anómalos.
+                                            </p>
+                                            <div>
+                                                <label className="form-label">Galones cargados</label>
+                                                <input type="number" step="0.001" min="0" className="form-input" value={formGasto.galones}
+                                                    onChange={(e) => setFormGasto({ ...formGasto, galones: e.target.value })} placeholder="Ej. 52.5" />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Precio por galón (USD)</label>
+                                                <input type="number" step="0.001" min="0" className="form-input" value={formGasto.precioPorGalon}
+                                                    onChange={(e) => setFormGasto({ ...formGasto, precioPorGalon: e.target.value })}
+                                                    placeholder={formGasto.galones && formGasto.monto ? (Number(formGasto.monto) / Number(formGasto.galones)).toFixed(3) : 'Se calcula solo'} />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Estación de servicio</label>
+                                                <input className="form-input" value={formGasto.estacionServicio}
+                                                    onChange={(e) => setFormGasto({ ...formGasto, estacionServicio: e.target.value })} placeholder="Ej. Primax Durán" />
+                                            </div>
+                                            <div>
+                                                <label className="form-label">Odómetro al cargar (km)</label>
+                                                <input type="number" min="0" className="form-input" value={formGasto.kilometrajeAlCargar}
+                                                    onChange={(e) => setFormGasto({ ...formGasto, kilometrajeAlCargar: e.target.value })} />
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className="md:col-span-2">
-                                        <label className="form-label">Comprobante (Imagen)</label>
-                                        <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                                        <label className="form-label">Comprobante (imagen o PDF, máx. 15 MB)</label>
+                                        <div className="border border-slate-200 rounded-md p-3 bg-slate-50">
                                             <input
                                                 type="file"
-                                                accept="image/*"
+                                                accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
                                                 onChange={(e) => setArchivoComprobante(e.target.files ? e.target.files[0] : null)}
                                                 className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
                                             />
@@ -1136,7 +1233,7 @@ export default function Viajes() {
                                 <button onClick={() => setMostrarModalCompletar(false)}><X className="text-slate-400 hover:text-rose-500" /></button>
                             </div>
                             <div className="modal-body space-y-4">
-                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 text-sm text-emerald-800 mb-4">
+                                <div className="bg-emerald-50 p-4 rounded-md border border-emerald-100 text-sm text-emerald-800 mb-4">
                                     <p>Ingrese los datos finales para cerrar el viaje y calcular la rentabilidad real.</p>
                                 </div>
                                 <div>
@@ -1149,11 +1246,12 @@ export default function Viajes() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="form-label">Kilometraje Real</label>
+                                    <label className="form-label">Kilómetros recorridos en el viaje</label>
                                     <input
                                         type="number"
+                                        min="1"
                                         className="form-input"
-                                        placeholder="Lectura final del odómetro"
+                                        placeholder="Se suman al odómetro del vehículo"
                                         value={datosComplecion.kilometrosReales}
                                         onChange={(e) => setDatosComplecion({ ...datosComplecion, kilometrosReales: e.target.value })}
                                     />
@@ -1173,7 +1271,7 @@ export default function Viajes() {
                 {imagenModalUrl && (
                     <div className="modal-overlay" onClick={() => setImagenModalUrl(null)}>
                         <div
-                            className="relative bg-white rounded-2xl shadow-2xl max-w-4xl max-h-[90vh] overflow-hidden"
+                            className="relative bg-white rounded-md shadow-md max-w-4xl max-h-[90vh] overflow-hidden"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="flex justify-between items-center p-4 border-b border-slate-100">
@@ -1186,11 +1284,19 @@ export default function Viajes() {
                                 </button>
                             </div>
                             <div className="p-4 bg-slate-50 flex items-center justify-center">
-                                <img
-                                    src={imagenModalUrl}
-                                    alt="Comprobante de gasto"
-                                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
-                                />
+                                {imagenModalUrl?.toLowerCase().endsWith('.pdf') ? (
+                                    <iframe
+                                        src={imagenModalUrl}
+                                        title="Comprobante PDF"
+                                        className="w-[80vw] max-w-3xl h-[70vh] rounded-lg border border-slate-200 bg-white"
+                                    />
+                                ) : (
+                                    <img
+                                        src={imagenModalUrl || ''}
+                                        alt="Comprobante de gasto"
+                                        className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
+                                    />
+                                )}
                             </div>
                             <div className="p-4 border-t border-slate-100 flex justify-end gap-3">
                                 <a

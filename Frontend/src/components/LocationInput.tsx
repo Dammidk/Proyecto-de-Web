@@ -120,7 +120,7 @@ export default function LocationInput({ label, value, onChange, placeholder, req
             </div>
 
             {open && results.length > 0 && (
-                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-auto">
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-auto">
                     {results.map((r, i) => (
                         <button
                             key={i}

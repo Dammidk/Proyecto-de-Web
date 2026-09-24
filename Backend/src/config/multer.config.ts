@@ -1,37 +1,70 @@
-// Configuración de Multer para manejo de archivos
+// Configuración de Multer para almacenamiento eficiente en Disco Local (VPS)
 import multer from 'multer';
+import path from 'path';
+import crypto from 'crypto';
+import fs from 'fs';
+import { storageService } from '../services/storage.service';
 
-// Almacenamiento en memoria para enviar directamente a Cloudinary
-const storage = multer.memoryStorage();
+// Almacenamiento en disco con streaming directo (cero saturación de memoria RAM)
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const baseUploads = storageService.getUploadsDir();
 
-// Filtro para validar tipos de archivo permitidos
+        // Determinar subdirectorio por contexto de la URL
+        let subfolder = 'gastos';
+        const url = req.baseUrl || req.originalUrl || '';
+
+        if (url.includes('mantenimiento')) {
+            subfolder = 'mantenimientos';
+        } else if (url.includes('pago')) {
+            subfolder = 'pagos';
+        }
+
+        const targetDir = path.join(baseUploads, subfolder);
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+
+        cb(null, targetDir);
+    },
+    filename: (req, file, cb) => {
+        // Nombre único y seguro. La extensión se deriva del tipo MIME validado, nunca del nombre
+        // original: así un "factura.html" declarado como imagen no se sirve luego como HTML (XSS).
+        const timestamp = Date.now();
+        const uuid = crypto.randomUUID();
+        const ext = Object.hasOwn(EXTENSIONES_PERMITIDAS, file.mimetype) ? EXTENSIONES_PERMITIDAS[file.mimetype] : '.bin';
+        cb(null, `${timestamp}-${uuid}${ext}`);
+    },
+});
+
+// Tipos de archivo permitidos y la extensión con la que se guardan
+const EXTENSIONES_PERMITIDAS: Record<string, string> = {
+    'image/jpeg': '.jpg',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
+    'application/pdf': '.pdf',
+};
+
+// Filtro de validación para tipos de archivo permitidos
 const fileFilter = (
     req: Express.Request,
     file: Express.Multer.File,
     cb: multer.FileFilterCallback
 ) => {
-    // Tipos de archivo permitidos
-    const allowedMimes = [
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'application/pdf',
-    ];
-
-    if (allowedMimes.includes(file.mimetype)) {
+    if (Object.hasOwn(EXTENSIONES_PERMITIDAS, file.mimetype)) {
         cb(null, true);
     } else {
-        cb(new Error('Tipo de archivo no permitido. Solo se permiten imágenes (JPEG, PNG, GIF, WebP) y PDF.'));
+        cb(new Error('Tipo de archivo no permitido. Solo se aceptan imágenes (JPEG, PNG, GIF, WebP) o facturas en PDF.'));
     }
 };
 
-// Configuración de Multer
+// Instancia configurada de Multer
 export const upload = multer({
     storage,
     fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024, // Límite de 5MB
+        fileSize: 15 * 1024 * 1024, // 15MB para soportar fotos de alta resolución o PDFs de múltiples páginas
     },
 });
 

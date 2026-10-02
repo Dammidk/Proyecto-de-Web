@@ -1,0 +1,78 @@
+services:
+  # ==========================================
+  # Base de Datos: PostgreSQL 17 Alpine
+  # ==========================================
+  db:
+    image: postgres:17-alpine
+    container_name: transporte-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-transporte_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - transporte-network
+
+  # ==========================================
+  # Backend: Node.js 22 + Express + Prisma ORM
+  # ==========================================
+  backend:
+    build:
+      context: ./Backend
+      dockerfile: Dockerfile
+    container_name: transporte-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-transporte_db}?schema=public
+      # Obligatorio: el backend no arranca en producción sin un secreto de al menos 32 caracteres
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET en el archivo .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-12h}
+      # Orígenes permitidos para CORS (el frontend se sirve por el mismo dominio vía Nginx)
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - transporte-network
+
+  # ==========================================
+  # Frontend: React 19 + Vite + Tailwind + Nginx
+  # ==========================================
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: transporte-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - transporte-network
+
+networks:
+  transporte-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  uploads_data:

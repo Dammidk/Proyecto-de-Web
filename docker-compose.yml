@@ -64,10 +64,13 @@ services:
       - backend
     networks:
       - transporte-network
+      - dokploy-network
 
 networks:
   transporte-network:
     driver: bridge
+  dokploy-network:
+    external: true
 
 volumes:
   postgres_data:

@@ -1,9 +1,21 @@
-// Login - Diseño Profesional
+// Inicio de sesión institucional
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Truck, Eye, EyeOff, Loader2, ShieldCheck, User } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Route, Wrench, Receipt, ShieldCheck } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const CAPACIDADES = [
+    { icono: Route, titulo: 'Operación de transporte', texto: 'Viajes, liquidación, cumplimiento documental y rentabilidad por ruta.' },
+    { icono: Wrench, titulo: 'Mantenimiento y neumáticos', texto: 'Preventivos, kardex de repuestos y control de llantas por posición.' },
+    { icono: Receipt, titulo: 'Facturación y cartera', texto: 'Cuentas por cobrar, antigüedad de saldos y control de mora.' },
+    { icono: ShieldCheck, titulo: 'Trazabilidad', texto: 'Cada cambio queda registrado con usuario, fecha y dirección de origen.' },
+];
+
+const CUENTAS_DEMO = [
+    { rol: 'Administrador', usuario: 'admin', clave: 'admin123' },
+    { rol: 'Auditor (solo lectura)', usuario: 'auditor', clave: 'auditor123' },
+];
 
 export default function Login() {
     const [usuario, setUsuario] = useState('');
@@ -19,7 +31,6 @@ export default function Login() {
         setLoading(true);
         try {
             await login(usuario, password);
-            toast.success('Bienvenido');
             navigate('/');
         } catch (err: any) {
             toast.error(err.response?.data?.mensaje || 'Credenciales inválidas');
@@ -27,92 +38,115 @@ export default function Login() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 flex items-center justify-center p-4">
-            <div className="w-full max-w-md">
-                {/* Logo */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl mb-4 shadow-xl shadow-indigo-500/30">
-                        <Truck className="w-8 h-8 text-white" />
+        <div className="min-h-screen grid lg:grid-cols-[minmax(0,5fr)_minmax(0,4fr)] bg-white">
+            <aside className="hidden lg:flex flex-col justify-between px-14 py-12 text-white" style={{ background: '#0e1b30' }}>
+                <div className="flex items-center gap-3">
+                    <img src="/favicon.svg" alt="" className="h-9 w-9" />
+                    <div>
+                        <p className="text-lg font-semibold leading-tight">FleetMaster</p>
+                        <p className="text-xs uppercase leading-tight" style={{ color: '#6f84a6', letterSpacing: '0.1em' }}>Gestión de flota</p>
                     </div>
-                    <h1 className="text-2xl font-bold text-white">FleetMaster</h1>
-                    <p className="text-sm text-slate-400 mt-1">Sistema de Gestión de Transporte</p>
                 </div>
 
-                {/* Form */}
-                <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-white/20">
-                    <h2 className="text-xl font-bold text-slate-800 text-center mb-6">Iniciar Sesión</h2>
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div>
-                            <label className="form-label">Usuario</label>
+                <div className="max-w-lg">
+                    <h1 className="text-3xl font-semibold leading-snug text-white">
+                        Control integral de la operación de transporte de carga
+                    </h1>
+                    <p className="mt-4 text-sm leading-relaxed" style={{ color: '#9fb2cf' }}>
+                        Una sola plataforma para la operación, el taller, la flota y las finanzas,
+                        con reglas de negocio aplicadas y auditoría de cada movimiento.
+                    </p>
+
+                    <ul className="mt-10 space-y-5">
+                        {CAPACIDADES.map(c => (
+                            <li key={c.titulo} className="flex gap-4">
+                                <c.icono className="h-5 w-5 mt-0.5 shrink-0" style={{ color: '#6f9fe0' }} strokeWidth={1.75} />
+                                <div>
+                                    <p className="text-sm font-medium text-white">{c.titulo}</p>
+                                    <p className="text-sm" style={{ color: '#9fb2cf' }}>{c.texto}</p>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <p className="text-xs" style={{ color: '#6f84a6' }}>
+                    {new Date().getFullYear()} FleetMaster. Uso restringido a personal autorizado.
+                </p>
+            </aside>
+
+            <main className="flex items-center justify-center px-6 py-12">
+                <div className="w-full max-w-sm">
+                    <div className="lg:hidden flex items-center gap-3 mb-10">
+                        <img src="/favicon.svg" alt="" className="h-9 w-9" />
+                        <p className="text-lg font-semibold text-slate-900">FleetMaster</p>
+                    </div>
+
+                    <p className="page-kicker">Acceso al sistema</p>
+                    <h2 className="text-2xl font-semibold text-slate-900">Iniciar sesión</h2>
+                    <p className="mt-1 text-sm text-slate-500">Ingrese con las credenciales asignadas por su administrador.</p>
+
+                    <form onSubmit={handleSubmit} className="mt-8">
+                        <div className="form-group">
+                            <label htmlFor="login-usuario" className="form-label">Usuario</label>
                             <input
+                                id="login-usuario"
                                 type="text"
                                 value={usuario}
                                 onChange={e => setUsuario(e.target.value)}
                                 className="form-input"
-                                placeholder="Ingrese su usuario"
+                                autoComplete="username"
                                 autoFocus
                             />
                         </div>
-                        <div>
-                            <label className="form-label">Contraseña</label>
+                        <div className="form-group">
+                            <label htmlFor="login-password" className="form-label">Contraseña</label>
                             <div className="relative">
                                 <input
+                                    id="login-password"
                                     type={showPass ? 'text' : 'password'}
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
-                                    className="form-input pr-12"
-                                    placeholder="••••••••"
+                                    className="form-input pr-10"
+                                    autoComplete="current-password"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => setShowPass(!showPass)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-800 p-1"
+                                    aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
                                 >
-                                    {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
+                                    {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
                         </div>
-                        <button type="submit" disabled={loading} className="btn btn-primary w-full py-3 text-base">
-                            {loading ? <><Loader2 size={20} className="animate-spin" /> Ingresando...</> : 'Ingresar'}
+                        <button id="login-submit" type="submit" disabled={loading} className="btn btn-primary w-full py-2.5 mt-2">
+                            {loading ? <><Loader2 size={16} className="animate-spin" /> Verificando</> : 'Ingresar'}
                         </button>
                     </form>
-                </div>
 
-                {/* Credenciales Demo */}
-                <div className="mt-6">
-                    <p className="text-center text-slate-400 text-xs mb-3">Acceso rápido (Demo)</p>
-                    <div className="grid grid-cols-2 gap-3">
-                        <button
-                            type="button"
-                            onClick={() => { setUsuario('admin'); setPassword('admin123'); }}
-                            className="p-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-left hover:bg-white/20 transition-colors group"
-                        >
-                            <div className="flex items-center gap-2 mb-1">
-                                <ShieldCheck className="h-4 w-4 text-indigo-400" />
-                                <p className="text-sm font-semibold text-white">Admin</p>
-                            </div>
-                            <p className="text-xs text-slate-400">admin / admin123</p>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => { setUsuario('auditor'); setPassword('auditor123'); }}
-                            className="p-4 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-left hover:bg-white/20 transition-colors group"
-                        >
-                            <div className="flex items-center gap-2 mb-1">
-                                <User className="h-4 w-4 text-emerald-400" />
-                                <p className="text-sm font-semibold text-white">Auditor</p>
-                            </div>
-                            <p className="text-xs text-slate-400">auditor / auditor123</p>
-                        </button>
+                    <div className="mt-10 border-t border-slate-200 pt-5">
+                        <p className="text-xs font-semibold uppercase text-slate-500" style={{ letterSpacing: '0.06em' }}>
+                            Cuentas de demostración
+                        </p>
+                        <ul className="mt-3 divide-y divide-slate-100 border border-slate-200 rounded-md">
+                            {CUENTAS_DEMO.map(c => (
+                                <li key={c.usuario}>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setUsuario(c.usuario); setPassword(c.clave); }}
+                                        className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50"
+                                    >
+                                        <span className="text-sm text-slate-700">{c.rol}</span>
+                                        <span className="text-xs font-mono text-slate-500">{c.usuario} / {c.clave}</span>
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                        <p className="mt-2 text-xs text-slate-500">Seleccione una cuenta para completar el formulario.</p>
                     </div>
                 </div>
-
-                {/* Footer */}
-                <p className="text-center text-slate-500 text-xs mt-8">
-                    © 2024 FleetMaster. Todos los derechos reservados.
-                </p>
-            </div>
+            </main>
         </div>
     );
 }
-

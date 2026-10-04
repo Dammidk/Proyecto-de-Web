@@ -38,7 +38,7 @@ const Auditoria = () => {
                 </div>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex gap-4">
+            <div className="bg-white p-4 rounded-md shadow-sm border border-slate-100 mb-6 flex gap-4">
                 <select className="form-select text-sm" value={filtros.entidad} onChange={e => setFiltros({ ...filtros, entidad: e.target.value })}>
                     <option value="">Todas las Entidades</option>
                     <option value="Vehiculo">Vehículos</option>
@@ -47,7 +47,8 @@ const Auditoria = () => {
                     <option value="Material">Materiales</option>
                     <option value="Viaje">Viajes</option>
                     <option value="GastoViaje">Gastos de Viaje</option>
-                    <option value="Comprobante">Comprobantes</option>
+                    <option value="Mantenimiento">Mantenimientos</option>
+                    <option value="PagoChofer">Pagos a Choferes</option>
                 </select>
                 <select className="form-select text-sm" value={filtros.accion} onChange={e => setFiltros({ ...filtros, accion: e.target.value })}>
                     <option value="">Todas las Acciones</option>
@@ -118,7 +119,7 @@ const Auditoria = () => {
                             <div>
                                 <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2">Datos Anteriores</h4>
                                 {seleccionado.datosAnteriores ? (
-                                    <pre className="text-xs bg-rose-50 text-rose-800 p-4 rounded-xl border border-rose-100 overflow-auto max-h-80 font-mono">
+                                    <pre className="text-xs bg-rose-50 text-rose-800 p-4 rounded-md border border-rose-100 overflow-auto max-h-80 font-mono">
                                         {JSON.stringify(seleccionado.datosAnteriores, null, 2)}
                                     </pre>
                                 ) : <p className="text-sm text-slate-400 italic">No hay datos previos (Creación)</p>}
@@ -126,7 +127,7 @@ const Auditoria = () => {
                             <div>
                                 <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 border-b border-slate-200 pb-2">Datos Nuevos</h4>
                                 {seleccionado.datosNuevos ? (
-                                    <pre className="text-xs bg-emerald-50 text-emerald-800 p-4 rounded-xl border border-emerald-100 overflow-auto max-h-80 font-mono">
+                                    <pre className="text-xs bg-emerald-50 text-emerald-800 p-4 rounded-md border border-emerald-100 overflow-auto max-h-80 font-mono">
                                         {JSON.stringify(seleccionado.datosNuevos, null, 2)}
                                     </pre>
                                 ) : <p className="text-sm text-slate-400 italic">No hay datos nuevos (Eliminación)</p>}

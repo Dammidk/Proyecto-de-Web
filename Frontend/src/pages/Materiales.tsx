@@ -166,7 +166,7 @@ const Materiales = () => {
                                 <div><label className="form-label">Nombre del Material</label><input required className="form-input" value={formData.nombre} onChange={e => setFormData({ ...formData, nombre: e.target.value })} /></div>
                                 <div><label className="form-label">Unidad de Medida</label><input required className="form-input" placeholder="Ej. Litros, Kg, Toneladas" value={formData.unidadMedida} onChange={e => setFormData({ ...formData, unidadMedida: e.target.value })} /></div>
 
-                                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-md border border-slate-100">
                                     <input
                                         type="checkbox"
                                         id="peligroso"

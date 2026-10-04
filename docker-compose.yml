@@ -10,8 +10,6 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-transporte_db}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -31,8 +29,6 @@ services:
       dockerfile: Dockerfile
     container_name: transporte-backend
     restart: unless-stopped
-    ports:
-      - "3001:3001"
     environment:
       NODE_ENV: production
       PORT: 3001
